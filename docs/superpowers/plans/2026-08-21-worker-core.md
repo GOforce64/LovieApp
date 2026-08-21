@@ -297,10 +297,19 @@ export default defineWorkersConfig(async () => {
           miniflare: {
             bindings: {
               TEST_MIGRATIONS: migrations,
+
               // Test doubles for the three real secrets.
               ENROLL_CODE_1: "test-code-one",
               ENROLL_CODE_2: "test-code-two",
               FCM_SERVICE_ACCOUNT: "{}",
+
+              // These override the [vars] block in wrangler.toml so the suite
+              // does not depend on whatever real values are deployed. The FCM
+              // tests intercept a URL built from FIREBASE_PROJECT_ID, so this
+              // value MUST stay "test-project" and match those interceptors.
+              FIREBASE_PROJECT_ID: "test-project",
+              PERSON_1_NAME: "Giorgos",
+              PERSON_2_NAME: "Her",
             },
           },
         },
@@ -1730,7 +1739,7 @@ git commit -m "feat(server): mint and cache Google OAuth access tokens"
 - Create: `server/test/fcm.test.ts`
 
 **Interfaces:**
-- Consumes: `getAccessToken` (Task 7); `Env` (Task 1)
+- Consumes: `Env` (Task 1) for `FIREBASE_PROJECT_ID`. The access token is a parameter supplied by the caller — this module never fetches one, which keeps it independently testable.
 - Produces:
   - `type PushResult = "ok" | "unregistered" | "error"`
   - `sendPush(env, accessToken, fcmToken, data, priority): Promise<PushResult>`
