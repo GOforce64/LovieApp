@@ -159,6 +159,7 @@ Replace the `"scripts"` block in `server/package.json` with:
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "migrate:local": "wrangler d1 migrations apply love-button --local",
     "migrate:remote": "wrangler d1 migrations apply love-button --remote"
@@ -792,7 +793,10 @@ Expected: FAIL — cannot resolve `../src/messages`
 ```typescript
 import type { Context } from "hono";
 import type { App } from "./env";
-import type { StatusCode } from "hono/utils/http-status";
+// ContentfulStatusCode, not StatusCode: `c.json()` always writes a body, so it
+// rejects the contentless codes (204, 304) and the -1 unofficial code that the
+// wider StatusCode union allows. fail() should never be called with those.
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
  * Every error the API returns has this shape, so the Android client only
@@ -800,7 +804,7 @@ import type { StatusCode } from "hono/utils/http-status";
  */
 export function fail(
   c: Context<App>,
-  status: StatusCode,
+  status: ContentfulStatusCode,
   code: string,
   message: string,
 ) {
@@ -1530,7 +1534,9 @@ import {
 
 /** Generates a throwaway RSA key and returns it in the PEM form Google uses. */
 async function generateTestPrivateKeyPem(): Promise<string> {
-  const pair = await crypto.subtle.generateKey(
+  // generateKey is typed CryptoKey | CryptoKeyPair because its return shape
+  // depends on the algorithm; RSASSA-PKCS1-v1_5 always yields a pair.
+  const pair = (await crypto.subtle.generateKey(
     {
       name: "RSASSA-PKCS1-v1_5",
       modulusLength: 2048,
@@ -1539,9 +1545,14 @@ async function generateTestPrivateKeyPem(): Promise<string> {
     },
     true,
     ["sign", "verify"],
-  );
+  )) as CryptoKeyPair;
 
-  const pkcs8 = await crypto.subtle.exportKey("pkcs8", pair.privateKey);
+  // exportKey is typed ArrayBuffer | JsonWebKey; the "pkcs8" format is the
+  // ArrayBuffer branch.
+  const pkcs8 = (await crypto.subtle.exportKey(
+    "pkcs8",
+    pair.privateKey,
+  )) as ArrayBuffer;
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pkcs8)));
   const lines = b64.match(/.{1,64}/g)!.join("\n");
 
