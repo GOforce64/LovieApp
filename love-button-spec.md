@@ -654,6 +654,21 @@ Treat her phone as an untested platform on day one, because it is.
   Android drops notifications from an app posting too rapidly. Both floors sit below
   the 500/hour ceiling, so rapid-fire sends may be dropped by the platform rather than
   by us.
+- **`INVALID_ARGUMENT` deletion is not self-healing.** §5.1 deletes a device row when
+  FCM returns `UNREGISTERED` *or* `INVALID_ARGUMENT`. The first is unambiguous — that
+  token is dead. The second is not: FCM can return `INVALID_ARGUMENT` for a malformed
+  *request* (an oversized payload, a bad field) rather than a bad token. If that ever
+  happens, every one of the recipient's tokens fails identically, so **all** her device
+  rows are deleted at once — and because her bearer token's row is gone with them, her
+  app cannot recover by calling `/v1/devices`. It gets 401, and she has to re-enrol by
+  hand with the code from your password manager.
+
+  The current call shape makes this unlikely: priority is a two-value literal, the data
+  payload is locked to strings, and the token is effectively the only variable input.
+  But if messages ever carry free text or larger payloads, narrow the deletion to
+  `UNREGISTERED` only, or check that the error detail actually names the token.
+  Revisit this during milestone 8 hardening.
+
 - **Force-stop kills FCM** until the app is reopened. Unfixable in code; document it.
 - **MIUI component names vary by version.** Always `try`/`catch` around OEM intents.
 
