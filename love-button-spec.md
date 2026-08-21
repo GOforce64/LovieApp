@@ -572,6 +572,52 @@ something you have already watched work. Milestone 3 exists because on MIUI a lo
 that works while you're staring at the phone may not work at 3am — leave it running
 overnight and send one in the morning before building anything else.
 
+### 10.1 Testing on two of your own phones, then handing over
+
+You do not need her phone to build this. Use a second phone of your own —
+an old handset, a tablet, anything running a Global-ROM Android 8 or newer —
+for every milestone up to and including 7.
+
+**There is no "unpair" step**, because there is no pairing. Enrolment codes are
+reusable by design, precisely so this works:
+
+1. Your test phone enrols with `ENROLL_CODE_2` — her code. It becomes *a device
+   belonging to person 2*. Nothing anywhere records that it is or isn't her.
+2. When you're ready to hand over, her phone enrols with **the same code**.
+   Person 2 now has two devices.
+3. `/v1/send` fans out to *all* of the recipient's device tokens, so both phones
+   buzz. This is a feature, not a bug — see below.
+4. Retire the test phone by opening the app on it and signing out, which calls
+   `DELETE /v1/devices`. If the phone is already wiped or sold, delete the row
+   directly:
+
+```bash
+wrangler d1 execute love-button --remote \
+  --command "SELECT id, person, label, updated_at FROM devices"
+wrangler d1 execute love-button --remote \
+  --command "DELETE FROM devices WHERE id = '<the test phone id>'"
+```
+
+Set a meaningful `label` at enrolment (`"test · Redmi Note"`) so the rows are
+tellable apart weeks later.
+
+**The trap:** rotating `ENROLL_CODE_2` does **not** revoke the test phone. Its
+bearer token was already issued and keeps working — rotating a code only stops
+*future* enrolments. To cut off a device you must delete its row.
+
+**Keep the test phone enrolled for the first week or two.** Every send lands on
+both, so you see exactly what she sees — including whether a sound is too loud or
+a notification arrives late — without having to ask her. An extra permanently
+enrolled device (a bedside tablet, an old handset) is a legitimate long-term
+setup, not a workaround.
+
+**What this does not prove:** a clean run on your two phones says nothing about
+hers. Every MIUI phone needs its own Autostart, battery and lock-in-recents
+setup (§8), and HyperOS versions differ in where those settings live and how
+aggressively they reset. The §8 checklist screen runs on her phone too, and the
+overnight test of milestone 3 must be repeated once she has the app installed.
+Treat her phone as an untested platform on day one, because it is.
+
 ---
 
 ## 11. Testing
