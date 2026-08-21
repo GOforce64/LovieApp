@@ -9,9 +9,11 @@ describe("GET /health", () => {
     expect(await res.json()).toEqual({ ok: true });
   });
 
-  it("returns 404 for an unknown path", async () => {
+  it("returns a JSON error for an unknown path", async () => {
     const res = await SELF.fetch("https://love-button.test/nope");
 
     expect(res.status).toBe(404);
+    expect(res.headers.get("Content-Type")).toContain("application/json");
+    expect(await res.json()).toMatchObject({ error: "not_found" });
   });
 });

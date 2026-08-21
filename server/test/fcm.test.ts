@@ -91,6 +91,21 @@ describe("sendPush", () => {
     expect(result).toBe("unregistered");
   });
 
+  it("treats a 404 with no FCM detail code as transient, not a dead token", async () => {
+    // This is what a mistyped FIREBASE_PROJECT_ID looks like: a generic 404 whose
+    // outer status says NOT_FOUND but which carries no token-specific detail. If
+    // this were classified "unregistered", the caller would delete every one of
+    // the recipient's device rows and lock her out.
+    fetchMock
+      .get(FCM_ORIGIN)
+      .intercept({ path: FCM_PATH, method: "POST" })
+      .reply(404, { error: { status: "NOT_FOUND", message: "Requested entity was not found." } });
+
+    const result = await sendPush(env, "access-token", "some-token", { type: "msg" }, "HIGH");
+
+    expect(result).toBe("error");
+  });
+
   it("reports error for a transient server failure", async () => {
     fetchMock
       .get(FCM_ORIGIN)

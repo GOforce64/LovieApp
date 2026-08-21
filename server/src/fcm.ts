@@ -26,17 +26,24 @@ interface FcmErrorBody {
   };
 }
 
-/** True when FCM is telling us this token will never work again. */
+/**
+ * True when FCM is telling us this specific token will never work again.
+ *
+ * Only the nested `details[].errorCode` proves that. The outer `error.status` is
+ * derived from the HTTP status, so a bare "NOT_FOUND" there can equally mean a
+ * mistyped FIREBASE_PROJECT_ID or a decommissioned Firebase project — in which
+ * case every one of the recipient's tokens 404s identically, and trusting the
+ * outer field would delete every device row she has. Her app cannot then recover
+ * via /v1/devices, because her bearer token's row went with them: she would have
+ * to re-enrol by hand. Trust the specific detail, never the generic status.
+ */
 function isPermanentTokenFailure(status: number, body: FcmErrorBody): boolean {
   if (status !== 404 && status !== 400) return false;
 
-  const codes = [
-    body.error?.status,
-    ...(body.error?.details ?? []).map((d) => d.errorCode),
-  ];
+  const detailCodes = (body.error?.details ?? []).map((d) => d.errorCode);
 
-  return codes.includes("UNREGISTERED") || codes.includes("INVALID_ARGUMENT") ||
-    codes.includes("NOT_FOUND");
+  return detailCodes.includes("UNREGISTERED") ||
+    detailCodes.includes("INVALID_ARGUMENT");
 }
 
 /**
