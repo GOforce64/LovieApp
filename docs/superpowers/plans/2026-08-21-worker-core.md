@@ -1941,17 +1941,24 @@ interface FcmErrorBody {
   };
 }
 
-/** True when FCM is telling us this token will never work again. */
+/**
+ * True when FCM is telling us this specific token will never work again.
+ *
+ * Only the nested `details[].errorCode` proves that. The outer `error.status` is
+ * derived from the HTTP status, so a bare "NOT_FOUND" there can equally mean a
+ * mistyped FIREBASE_PROJECT_ID or a decommissioned Firebase project — in which
+ * case every one of the recipient's tokens 404s identically, and trusting the
+ * outer field would delete every device row she has. Her app cannot then recover
+ * via /v1/devices, because her bearer token's row went with them: she would have
+ * to re-enrol by hand. Trust the specific detail, never the generic status.
+ */
 function isPermanentTokenFailure(status: number, body: FcmErrorBody): boolean {
   if (status !== 404 && status !== 400) return false;
 
-  const codes = [
-    body.error?.status,
-    ...(body.error?.details ?? []).map((d) => d.errorCode),
-  ];
+  const detailCodes = (body.error?.details ?? []).map((d) => d.errorCode);
 
-  return codes.includes("UNREGISTERED") || codes.includes("INVALID_ARGUMENT") ||
-    codes.includes("NOT_FOUND");
+  return detailCodes.includes("UNREGISTERED") ||
+    detailCodes.includes("INVALID_ARGUMENT");
 }
 
 /**
@@ -2321,6 +2328,7 @@ import type { App } from "./env";
 import { enroll } from "./routes/enroll";
 import { devices } from "./routes/devices";
 import { send } from "./routes/send";
+import { fail } from "./http";
 
 const app = new Hono<App>();
 
@@ -2334,6 +2342,16 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.route("/v1", enroll);
 app.route("/v1", devices);
 app.route("/v1", send);
+
+// Without these two, Hono's built-in handlers answer with text/plain, which
+// breaks the spec's "all responses are JSON" contract on exactly the two paths a
+// client most needs a clean failure: a mistyped route, and an unexpected throw.
+app.notFound((c) => fail(c, 404, "not_found", "No such endpoint."));
+
+app.onError((err, c) => {
+  console.error(err);
+  return fail(c, 500, "internal_error", "Something went wrong.");
+});
 
 export default app;
 ```
