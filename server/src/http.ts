@@ -1,6 +1,9 @@
 import type { Context } from "hono";
 import type { App } from "./env";
-import type { StatusCode } from "hono/utils/http-status";
+// ContentfulStatusCode, not StatusCode: `c.json()` always writes a body, so it
+// rejects the contentless codes (204, 304) and the -1 unofficial code that the
+// wider StatusCode union allows. fail() should never be called with those.
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
  * Every error the API returns has this shape, so the Android client only
@@ -8,7 +11,7 @@ import type { StatusCode } from "hono/utils/http-status";
  */
 export function fail(
   c: Context<App>,
-  status: StatusCode,
+  status: ContentfulStatusCode,
   code: string,
   message: string,
 ) {

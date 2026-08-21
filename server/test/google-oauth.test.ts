@@ -8,7 +8,9 @@ import {
 
 /** Generates a throwaway RSA key and returns it in the PEM form Google uses. */
 async function generateTestPrivateKeyPem(): Promise<string> {
-  const pair = await crypto.subtle.generateKey(
+  // generateKey is typed CryptoKey | CryptoKeyPair because its return shape
+  // depends on the algorithm; RSASSA-PKCS1-v1_5 always yields a pair.
+  const pair = (await crypto.subtle.generateKey(
     {
       name: "RSASSA-PKCS1-v1_5",
       modulusLength: 2048,
@@ -17,9 +19,14 @@ async function generateTestPrivateKeyPem(): Promise<string> {
     },
     true,
     ["sign", "verify"],
-  );
+  )) as CryptoKeyPair;
 
-  const pkcs8 = await crypto.subtle.exportKey("pkcs8", pair.privateKey);
+  // exportKey is typed ArrayBuffer | JsonWebKey; the "pkcs8" format is the
+  // ArrayBuffer branch.
+  const pkcs8 = (await crypto.subtle.exportKey(
+    "pkcs8",
+    pair.privateKey,
+  )) as ArrayBuffer;
   const b64 = btoa(String.fromCharCode(...new Uint8Array(pkcs8)));
   const lines = b64.match(/.{1,64}/g)!.join("\n");
 
