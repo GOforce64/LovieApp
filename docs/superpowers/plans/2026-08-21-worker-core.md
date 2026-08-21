@@ -1198,12 +1198,20 @@ import { sha256Hex } from "../src/crypto";
 
 const TOKEN = "a".repeat(64);
 
-async function seedDevice(id = "dev-auth", person = 1, fcm = "fcm-seed") {
+// `token` is a parameter because devices.auth_hash is NOT NULL UNIQUE: any test
+// that seeds a second device must give it a different token, or the insert is
+// rejected by the constraint rather than by the code under test.
+async function seedDevice(
+  id = "dev-auth",
+  person = 1,
+  fcm = "fcm-seed",
+  token = TOKEN,
+) {
   await env.DB.prepare(
     `INSERT INTO devices (id, person, auth_hash, fcm_token, label, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(id, person, await sha256Hex(TOKEN), fcm, "seeded", 1000, 1000)
+    .bind(id, person, await sha256Hex(token), fcm, "seeded", 1000, 1000)
     .run();
 }
 
@@ -1283,7 +1291,7 @@ describe("POST /v1/devices", () => {
   });
 
   it("removes another device row holding the same FCM token", async () => {
-    await seedDevice("dev-stale", 2, "fcm-rotated");
+    await seedDevice("dev-stale", 2, "fcm-rotated", "b".repeat(64));
 
     await authed("/v1/devices", {
       method: "POST",
@@ -1314,7 +1322,7 @@ describe("DELETE /v1/devices", () => {
   });
 
   it("deletes only the calling device", async () => {
-    await seedDevice("dev-other", 2, "fcm-other");
+    await seedDevice("dev-other", 2, "fcm-other", "b".repeat(64));
 
     const res = await authed("/v1/devices", { method: "DELETE" });
     expect(res.status).toBe(200);
