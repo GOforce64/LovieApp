@@ -31,6 +31,14 @@ export const requireDevice = createMiddleware<App>(async (c, next) => {
     .bind(authHash)
     .first<DeviceRow>();
 
+  // The two 401 messages in this file are deliberately different, and that is
+  // not an information leak. Each only restates what the caller already sent:
+  // "Missing bearer token" means they presented no usable header, "Unknown or
+  // revoked token" means they presented one that matches no device row. Neither
+  // reveals server state the caller does not already hold, and a valid token is
+  // already distinguishable from an invalid one by the status code alone. They
+  // are kept distinct because the difference between "my header is malformed"
+  // and "my phone was deregistered" is exactly what you need when debugging.
   if (!device) {
     return fail(c, 401, "unauthorized", "Unknown or revoked token.");
   }
