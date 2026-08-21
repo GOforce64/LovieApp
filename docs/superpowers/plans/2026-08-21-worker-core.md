@@ -530,13 +530,20 @@ CREATE INDEX idx_sends_from_time ON sends(from_person, sent_at);
 Run: `cd server && npm test -- schema`
 Expected: all four tests PASS
 
-- [ ] **Step 5: Apply the migration to the real remote database**
+- [ ] **Step 5: Apply the migration to the real remote database** — ⚠️ **DEFERRED, STILL OUTSTANDING**
+
+**This step was skipped during implementation** because Task 0 had not been run and
+no D1 database existed to migrate. The schema is created and fully tested locally,
+but it does **not** yet exist on Cloudflare.
+
+**Run this once Task 0 is complete, before any deploy:**
 
 ```bash
 cd server && npm run migrate:remote
 ```
 
-Expected: wrangler reports two statements applied.
+Expected: wrangler reports two statements applied. Task 10 Step 3 (deploy) will not
+work correctly until this has been done.
 
 - [ ] **Step 6: Commit**
 
