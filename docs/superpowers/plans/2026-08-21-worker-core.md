@@ -119,8 +119,13 @@ mkdir -p server/src server/test server/migrations
 cd server
 npm init -y
 npm install hono
-npm install -D wrangler typescript vitest@3 @cloudflare/vitest-pool-workers @cloudflare/workers-types
+npm install -D wrangler typescript vitest@3 "@cloudflare/vitest-pool-workers@^0.12.0" @cloudflare/workers-types
 ```
+
+The pool-workers version is pinned deliberately: 0.13.0 and later require Vitest 4,
+which conflicts with the `vitest@3` this plan's test code targets. 0.12.0 exports
+`SELF`, `readD1Migrations` and `applyD1Migrations` with the same signatures, so no
+test or config code changes.
 
 - [ ] **Step 2: Write the repo-root `.gitignore`**
 
