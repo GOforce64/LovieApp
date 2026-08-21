@@ -2045,7 +2045,9 @@ beforeAll(() => {
 
 afterEach(() => fetchMock.assertNoPendingInterceptors());
 
-function interceptFcm(status: number, body: unknown) {
+// `object`, not `unknown`: undici's MockInterceptor.reply is typed
+// `TData extends object`, so `unknown` does not satisfy it under strict mode.
+function interceptFcm(status: number, body: object) {
   fetchMock
     .get(FCM_ORIGIN)
     .intercept({ path: FCM_PATH, method: "POST" })
