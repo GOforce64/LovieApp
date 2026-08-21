@@ -1,0 +1,25 @@
+name = "love-button"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "your-firebase-project-id"
+PERSON_1_NAME = "Giorgos"
+PERSON_2_NAME = "Her"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "love-button"
+# Placeholder — Task 0 has not been run yet. Replace with the real D1
+# database id (from `wrangler d1 create love-button`) before `wrangler deploy`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "TOKEN_CACHE"
+# Placeholder — Task 0 has not been run yet. Replace with the real KV
+# namespace id (from `wrangler kv namespace create`) before `wrangler deploy`.
+id = "00000000-0000-0000-0000-000000000000"
+
+[triggers]
+crons = []

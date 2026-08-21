@@ -1,0 +1,15 @@
+# secrets — never commit
+*.jks
+*.keystore
+keystore.properties
+local.properties
+service-account*.json
+.dev.vars
+app/google-services.json
+
+# build
+build/
+.gradle/
+node_modules/
+.wrangler/
+dist/
