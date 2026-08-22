@@ -1216,9 +1216,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -1251,9 +1254,9 @@ private fun Root() {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
     val enrolment by prefs.enrolment.collectAsState(initial = null)
-    var loaded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var loaded by remember { mutableStateOf(false) }
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         prefs.current()
         loaded = true
     }
@@ -1711,24 +1714,17 @@ fun HomeScreen(partnerName: String, onOpenSetup: () -> Unit) {
 Replace the `else ->` branch of `Root()` with:
 
 ```kotlin
-        else -> {
-            var showSetup by androidx.compose.runtime.remember {
-                androidx.compose.runtime.mutableStateOf(false)
-            }
-            if (showSetup) {
-                SetupScreen(onDone = { showSetup = false })
-            } else {
-                HomeScreen(
-                    partnerName = enrolment!!.partnerName,
-                    onOpenSetup = { showSetup = true },
-                )
-            }
-        }
+        else -> HomeScreen(
+            partnerName = enrolment!!.partnerName,
+            // Wired to the real Setup screen in Task 8, which creates it. This task
+            // must compile and run on its own, so the button does nothing for now.
+            onOpenSetup = {},
+        )
 ```
 
-Add the imports `com.lovebutton.app.ui.HomeScreen` and `com.lovebutton.app.ui.SetupScreen`.
+Add the import `com.lovebutton.app.ui.HomeScreen`.
 
-**`SetupScreen` does not exist until Task 8.** Implement Task 8 before building, or temporarily point `onOpenSetup` at a no-op — but do not commit a build that does not compile.
+This task is self-contained: it builds, installs and sends without `SetupScreen` existing. Task 8 creates that screen and wires this button to it.
 
 - [ ] **Step 4: Commit (after Task 8 compiles)**
 
@@ -1869,10 +1865,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.lovebutton.app.device.areNotificationsEnabled
 import com.lovebutton.app.device.isIgnoringBatteryOptimisations
 import com.lovebutton.app.device.isProbablyXiaomi
+import com.lovebutton.app.device.openAppSettings
 import com.lovebutton.app.device.openBatteryOptimisationSettings
 import com.lovebutton.app.device.openMiuiAutostart
 import com.lovebutton.app.device.openMiuiBatterySaver
@@ -1919,7 +1915,10 @@ fun SetupScreen(onDone: () -> Unit) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 } else {
-                    openBatteryOptimisationSettings(context)
+                    // Before Android 13 there is no runtime permission to request —
+                    // notifications are on unless the user turned them off, so the
+                    // only useful action is to open the app's own settings page.
+                    openAppSettings(context)
                 }
             },
         )
