@@ -40,6 +40,7 @@ names a version:
 | Gradle 8.13 | Will not start under JDK 26 |
 | Gradle 9.6+ | Removes an internal API AGP 8.13.0 calls |
 | Compose BOM 2026.08.00 | Pins Compose 1.12.0, which demands compileSdk 37 **and** AGP 9.1+ — surfaces as 22 AAR-metadata violations |
+| Compiling on JDK 26 | AGP's `jlink` JDK-image step fails: "cannot find the build signature in the java.base specified on module path". Fixed by the Java toolchain block in `app/build.gradle.kts`, which pins **compilation** to JDK 21 while Gradle itself still runs on 26 |
 
 If you do want the newer stack later, it is available: `platforms/android-37.0` is a
 real installable SDK platform (note the `.0` — plain `android-37` does not exist), and
@@ -61,6 +62,13 @@ Gradle's Android plugin requires it even to run JVM unit tests, so Tasks 2 and 3
 be checked without it either. Install Android Studio (which bundles the SDK) or the
 command-line tools, and ensure `ANDROID_HOME` is set or `local.properties` contains
 `sdk.dir`. `local.properties` is machine-specific and gitignored — never commit it.
+
+**A JDK 21 must also be installed**, separately from whatever JDK runs Gradle. The
+toolchain block in `app/build.gradle.kts` requires it, and Gradle will fail with "No
+matching toolchains found" if no JDK 21 is discoverable. Gradle scans `~/.jdks`,
+SDKMAN, asdf and the usual system locations; an unpacked Temurin 21 in `~/.jdks` is
+enough. Do not work around a missing toolchain by hardcoding `org.gradle.java.home`
+in the committed `gradle.properties` — that bakes one machine's path into the repo.
 
 ---
 
@@ -275,6 +283,23 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+/**
+ * The JDK used to COMPILE, which is not the JDK that runs Gradle.
+ *
+ * AGP 8.13 builds a trimmed JDK image with `jlink` as part of javac setup, and
+ * that step fails outright on JDK 26 with "cannot find the build signature in the
+ * java.base specified on module path" — nothing that mentions a version. Declaring
+ * a toolchain here lets Gradle locate a JDK 21 itself (it scans ~/.jdks, SDKMAN,
+ * asdf and the usual system paths) instead of anyone hardcoding a machine path.
+ *
+ * Bytecode target stays at 17 above; a 21 toolchain emitting 17 is normal.
+ */
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
