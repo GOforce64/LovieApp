@@ -5,7 +5,10 @@ googleServices = "4.4.4"
 coreKtx = "1.17.0"
 lifecycle = "2.9.4"
 activityCompose = "1.11.0"
-composeBom = "2026.08.00"
+# 2026.06.01 pins Compose 1.11.4. Do NOT bump to 2026.08.00 (Compose 1.12.0)
+# without also moving to AGP 9.1+ and compileSdk 37 — 1.12.0 demands both, and
+# the failure is 22 opaque AAR-metadata violations, not a version message.
+composeBom = "2026.06.01"
 firebaseBom = "34.4.0"
 okhttp = "5.2.0"
 serialization = "1.9.0"
