@@ -1,0 +1,122 @@
+package com.lovebutton.app.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.IOException
+
+/**
+ * Every call the app makes to the Worker.
+ *
+ * Deliberately small and dependency-light: OkHttp plus kotlinx.serialization, no
+ * Retrofit. There are three endpoints, and being able to read the whole client in
+ * one sitting is worth more here than the boilerplate a framework would save.
+ *
+ * Nothing in this class ever logs `authToken`. It is the only credential the app
+ * holds, and Logcat is readable by anyone with adb.
+ */
+class LoveButtonApi(
+    private val baseUrl: String,
+    private val client: OkHttpClient = OkHttpClient(),
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun post(path: String, body: String, authToken: String?): Request {
+        // No MediaType is passed to toRequestBody() here on purpose: OkHttp's
+        // BridgeInterceptor unconditionally overwrites the Content-Type header from
+        // requestBody.contentType() whenever that is non-null, appending
+        // "; charset=utf-8" and clobbering the exact header set below. Leaving the
+        // body's content type unset (bytes still default to UTF-8) means our
+        // explicit header wins, and Content-Type reaches the server as exactly
+        // "application/json".
+        val builder = Request.Builder()
+            .url("$baseUrl$path")
+            .post(body.toRequestBody())
+            .header("Content-Type", "application/json")
+
+        if (authToken != null) {
+            builder.header("Authorization", "Bearer $authToken")
+        }
+        return builder.build()
+    }
+
+    private suspend fun execute(request: Request): Response = withContext(Dispatchers.IO) {
+        client.newCall(request).execute()
+    }
+
+    /** Trades an enrolment code for a device bearer token. Called once per phone. */
+    suspend fun enrol(code: String, fcmToken: String, label: String): EnrolResult {
+        val body = json.encodeToString(EnrolRequest(code, fcmToken, label))
+
+        return try {
+            execute(post("/v1/enroll", body, authToken = null)).use { response ->
+                val text = response.body.string()
+
+                when (response.code) {
+                    200 -> {
+                        val parsed = json.decodeFromString<EnrolResponse>(text)
+                        EnrolResult.Ok(
+                            deviceId = parsed.deviceId,
+                            authToken = parsed.authToken,
+                            person = parsed.person,
+                            partnerName = parsed.partnerName,
+                        )
+                    }
+                    403 -> EnrolResult.InvalidCode
+                    429 -> EnrolResult.RateLimited
+                    else -> EnrolResult.Failed(errorMessage(text, response.code))
+                }
+            }
+        } catch (e: IOException) {
+            EnrolResult.Failed("Could not reach the server. Check your connection.")
+        }
+    }
+
+    /**
+     * Refreshes the FCM token the server pushes to. Returns false when the server
+     * rejects the bearer token, which means this device was deregistered and must
+     * enrol again.
+     */
+    suspend fun registerDevice(authToken: String, fcmToken: String): Boolean {
+        val body = json.encodeToString(DeviceRequest(fcmToken))
+
+        return try {
+            execute(post("/v1/devices", body, authToken)).use { it.isSuccessful }
+        } catch (e: IOException) {
+            false
+        }
+    }
+
+    /**
+     * Sends one message. The body carries a message id and nothing else — there is
+     * no field naming a recipient, because the server derives it.
+     *
+     * Throws on failure so the calling WorkManager job can retry. A `delivered` of
+     * zero is NOT a failure: it means her phone has no active device, which the UI
+     * reports differently from a network error.
+     */
+    suspend fun send(authToken: String, msgId: Int): SendResult {
+        val body = json.encodeToString(SendRequest(msgId))
+
+        execute(post("/v1/send", body, authToken)).use { response ->
+            val text = response.body.string()
+
+            if (!response.isSuccessful) {
+                throw IOException("send failed: ${errorMessage(text, response.code)}")
+            }
+
+            val parsed = json.decodeFromString<SendResponse>(text)
+            return SendResult(parsed.sendId, parsed.delivered)
+        }
+    }
+
+    private fun errorMessage(text: String, code: Int): String = try {
+        json.decodeFromString<ApiError>(text).message.ifBlank { "HTTP $code" }
+    } catch (e: Exception) {
+        "HTTP $code"
+    }
+}
