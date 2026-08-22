@@ -45,6 +45,23 @@ android {
     }
 }
 
+/**
+ * The JDK used to COMPILE, which is not the JDK that runs Gradle.
+ *
+ * AGP 8.13 builds a trimmed JDK image with `jlink` as part of javac setup, and
+ * that step fails outright on JDK 26 with "cannot find the build signature in the
+ * java.base specified on module path" — nothing that mentions a version. Declaring
+ * a toolchain here lets Gradle locate a JDK 21 itself (it scans ~/.jdks, SDKMAN,
+ * asdf and the usual system paths) instead of anyone hardcoding a machine path.
+ *
+ * Bytecode target stays at 17 above; a 21 toolchain emitting 17 is normal.
+ */
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
