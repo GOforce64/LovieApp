@@ -30,6 +30,23 @@
 
 Task 1 pins concrete versions in `gradle/libs.versions.toml`. If any version fails to resolve, take the latest stable release of that artifact, use it, and **report the substitution in your task report** — do not downgrade Kotlin or AGP to make an old version fit, and do not drop a dependency to avoid the problem.
 
+**The toolchain versions are a coupled set, not independent knobs.** The working
+combination is JDK 26 + Gradle 9.5.0 + AGP 8.13.0 + compileSdk 36 + Compose BOM
+2026.06.01. Moving any one of them tends to break another, and none of the failures
+names a version:
+
+| Change | What breaks |
+|---|---|
+| Gradle 8.13 | Will not start under JDK 26 |
+| Gradle 9.6+ | Removes an internal API AGP 8.13.0 calls |
+| Compose BOM 2026.08.00 | Pins Compose 1.12.0, which demands compileSdk 37 **and** AGP 9.1+ — surfaces as 22 AAR-metadata violations |
+
+If you do want the newer stack later, it is available: `platforms/android-37.0` is a
+real installable SDK platform (note the `.0` — plain `android-37` does not exist), and
+AGP 9.3.1 is stable. That upgrade means moving AGP, compileSdk, targetSdk and probably
+Gradle together, and AGP 9 changed parts of the Gradle DSL this plan uses. Do it as its
+own piece of work, not in passing.
+
 **The Gradle wrapper version is load-bearing and was found the hard way.** On a machine
 whose only JDK is 26, the window is narrow: Gradle 8.13 will not start at all under
 JDK 26, and Gradle 9.6+ removes an internal API that AGP 8.13.0 still calls. **Gradle
@@ -148,7 +165,10 @@ googleServices = "4.4.4"
 coreKtx = "1.17.0"
 lifecycle = "2.9.4"
 activityCompose = "1.11.0"
-composeBom = "2026.08.00"
+# 2026.06.01 pins Compose 1.11.4. Do NOT bump to 2026.08.00 (Compose 1.12.0)
+# without also moving to AGP 9.1+ and compileSdk 37 — 1.12.0 demands both, and
+# the failure is 22 opaque AAR-metadata violations, not a version message.
+composeBom = "2026.06.01"
 firebaseBom = "34.4.0"
 okhttp = "5.2.0"
 serialization = "1.9.0"
