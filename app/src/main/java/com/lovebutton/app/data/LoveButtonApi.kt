@@ -3,11 +3,14 @@ package com.lovebutton.app.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.IOException
+
+private val JSON_MEDIA_TYPE = "application/json".toMediaType()
 
 /**
  * Every call the app makes to the Worker.
@@ -26,17 +29,13 @@ class LoveButtonApi(
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun post(path: String, body: String, authToken: String?): Request {
-        // No MediaType is passed to toRequestBody() here on purpose: OkHttp's
-        // BridgeInterceptor unconditionally overwrites the Content-Type header from
-        // requestBody.contentType() whenever that is non-null, appending
-        // "; charset=utf-8" and clobbering the exact header set below. Leaving the
-        // body's content type unset (bytes still default to UTF-8) means our
-        // explicit header wins, and Content-Type reaches the server as exactly
-        // "application/json".
+        // No explicit Content-Type header: the body carries its media type, and
+        // OkHttp's BridgeInterceptor derives the header from it — appending
+        // "; charset=utf-8". Setting the header by hand as well is not merely
+        // redundant, it loses: the interceptor overwrites whatever you set.
         val builder = Request.Builder()
             .url("$baseUrl$path")
-            .post(body.toRequestBody())
-            .header("Content-Type", "application/json")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
 
         if (authToken != null) {
             builder.header("Authorization", "Bearer $authToken")

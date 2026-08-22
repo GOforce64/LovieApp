@@ -51,7 +51,13 @@ class LoveButtonApiTest {
         val request = server.takeRequest()
         assertEquals("POST", request.method)
         assertEquals("/v1/enroll", request.path)
-        assertEquals("application/json", request.getHeader("Content-Type"))
+        // startsWith, not equals: OkHttp appends "; charset=utf-8" to the media
+        // type. The server checks `contentType.includes("application/json")`, so
+        // that suffix is fine — asserting exact equality would over-specify the
+        // header and pressure the source into dropping its media type to comply.
+        assertTrue(
+            request.getHeader("Content-Type")!!.startsWith("application/json"),
+        )
 
         val sent = request.body.readUtf8()
         assertTrue(sent.contains("\"code\":\"secret-code\""))
