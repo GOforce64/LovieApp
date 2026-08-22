@@ -1218,7 +1218,20 @@ fun EnrolScreen(onEnrolled: () -> Unit) {
                             // The FCM token is required at enrolment so the server
                             // can push to this phone immediately, without waiting
                             // for a separate registration call.
-                            val fcmToken = FirebaseMessaging.getInstance().token.await()
+                            //
+                            // This fetch gets its own try so that ONLY it produces
+                            // the Play Services message. Wrapping the whole flow in
+                            // one catch would blame Google for a malformed response
+                            // or a disk failure while saving — sending you to debug
+                            // entirely the wrong thing.
+                            val fcmToken = try {
+                                FirebaseMessaging.getInstance().token.await()
+                            } catch (e: Exception) {
+                                error = "Could not get a push token from Google. " +
+                                    "Check that Play Services is available."
+                                return@launch
+                            }
+
                             val label = "${Build.MANUFACTURER} ${Build.MODEL}"
 
                             when (val result = api.enrol(code, fcmToken, label)) {
@@ -1238,9 +1251,12 @@ fun EnrolScreen(onEnrolled: () -> Unit) {
                                     error = result.message
                             }
                         } catch (e: Exception) {
-                            error = "Could not get a push token from Google. " +
-                                "Check that Play Services is available."
+                            // Anything the specific handlers did not claim.
+                            error = "Something went wrong enrolling this phone. " +
+                                "Please try again."
                         } finally {
+                            // Runs on every exit path, including the return@launch
+                            // above, so the spinner can never stick.
                             busy = false
                         }
                     }
