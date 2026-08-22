@@ -30,6 +30,21 @@
 
 Task 1 pins concrete versions in `gradle/libs.versions.toml`. If any version fails to resolve, take the latest stable release of that artifact, use it, and **report the substitution in your task report** — do not downgrade Kotlin or AGP to make an old version fit, and do not drop a dependency to avoid the problem.
 
+**The Gradle wrapper version is load-bearing and was found the hard way.** On a machine
+whose only JDK is 26, the window is narrow: Gradle 8.13 will not start at all under
+JDK 26, and Gradle 9.6+ removes an internal API that AGP 8.13.0 still calls. **Gradle
+9.5.0 is the version that satisfies both.** If you change the AGP or JDK version, expect
+to move this too — and note that the failure at each end looks nothing like a version
+problem (a startup crash on one side, a missing-class error deep in AGP on the other).
+
+## Environment prerequisite
+
+**An Android SDK must be installed before any task in this plan can be verified.**
+Gradle's Android plugin requires it even to run JVM unit tests, so Tasks 2 and 3 cannot
+be checked without it either. Install Android Studio (which bundles the SDK) or the
+command-line tools, and ensure `ANDROID_HOME` is set or `local.properties` contains
+`sdk.dir`. `local.properties` is machine-specific and gitignored — never commit it.
+
 ---
 
 ## File Structure
