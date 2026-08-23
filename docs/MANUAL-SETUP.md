@@ -294,4 +294,12 @@ Task 6 Step 5 also needs both phones enrolled, one with each code from C5.
 1. **Force-stopping the app from Settings kills FCM delivery entirely** until she
    opens the app again. This is Android, not a bug in this project. Don't force-stop
    it, and tell her not to.
+
+   **Anything sent during that window is gone for good** — verified 2026-08-24.
+   Reopening the app restores delivery but replays nothing. FCM's store-and-forward
+   only covers an *unreachable* device; a reachable phone running a force-stopped app
+   takes delivery at the Play Services layer, finds no app to hand it to, and drops
+   it. No TTL setting changes that, and there is no catch-up endpoint by design —
+   four stale buzzes arriving an hour late is worse than none, because the product is
+   the moment rather than the message.
 2. **Losing the enrolment codes** means re-deploying new ones. Password manager, C5.
