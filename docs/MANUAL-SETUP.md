@@ -231,6 +231,25 @@ adb -s <serial> install app/build/outputs/apk/debug/app-debug.apk
 
 Without `-s`, adb refuses with "more than one device" rather than guessing.
 
+### If "Install via USB" demands a SIM card
+
+Hit on phone 2, 2026-08-24. HyperOS validates the toggle against Xiaomi's servers
+and refuses without a SIM present. In order of preference:
+
+1. **Wireless debugging** — Developer options → Wireless debugging → "Pair device
+   with pairing code", then `adb pair <ip>:<pairPort>` and `adb connect
+   <ip>:<mainPort>`. Different code path from USB installs, so the toggle does not
+   apply. Gives full adb. Note the pairing port and the connect port differ.
+2. **Any SIM** — the check is presence, not an active plan. An expired SIM works.
+   The toggle usually stays on after the SIM is removed.
+3. **Sideload by hand** — enough for the second phone, which per Task 6 Step 9 only
+   needs the app *installed and enrolled*; sends come from curl and verification is
+   by eye. Copy the APK over MTP, tap it in Files, allow "Install unknown apps".
+
+**Not recommended:** the region-change-to-India trick. It unlocks the toggle but
+moves an EEA device off EEA privacy defaults — disproportionate when 1 and 3 work.
+
+
 - [x] **D3. Point the app at the Worker** — done, via `local.properties`
 
 `API_BASE_URL` is read from `local.properties` (gitignored) rather than committed,
