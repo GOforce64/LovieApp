@@ -68,11 +68,11 @@ git status --short          # google-services.json must NOT be listed
 
 Free (Spark plan). No card.
 
-- [ ] **B1. Create the project** — <https://console.firebase.google.com>
+- [x] **B1. Create the project** — `lovieapp-b4068` — <https://console.firebase.google.com>
 
 Any name. Google Analytics: off (nothing uses it).
 
-- [ ] **B2. Add an Android app**
+- [x] **B2. Add an Android app**
 
 Package name must be exactly:
 
@@ -83,7 +83,7 @@ com.lovebutton.app
 Getting this wrong is silent — the app builds and then FCM never delivers.
 Skip the SHA-1 field; nothing here uses Google sign-in.
 
-- [ ] **B3. Download `google-services.json`**
+- [x] **B3. Download `google-services.json`** — in place, gitignored
 
 Put it at `app/google-services.json` (the repo has a `.example` next to it showing
 the shape). It is gitignored.
@@ -109,16 +109,16 @@ Both must succeed — the file exists *and* git is ignoring it.
 
 Free plan. No card.
 
-- [ ] **C1. Create a Cloudflare account** — <https://dash.cloudflare.com/sign-up>
+- [x] **C1. Create a Cloudflare account** — <https://dash.cloudflare.com/sign-up>
 
-- [ ] **C2. Install and authenticate wrangler**
+- [x] **C2. Install and authenticate wrangler**
 
 ```bash
 npm install -g wrangler
 wrangler login
 ```
 
-- [ ] **C3. Create the database and the KV namespace**
+- [x] **C3. Create the database and the KV namespace** — done: D1 `2bf232d6-…` (WEUR), KV `939528e7…`
 
 ```bash
 wrangler d1 create love-button
@@ -127,7 +127,7 @@ wrangler kv namespace create TOKEN_CACHE
 
 Copy the `database_id` and the KV `id` out of the output. **Both.**
 
-- [ ] **C4. Paste them into `server/wrangler.toml`**
+- [x] **C4. Paste them into `server/wrangler.toml`** — done, committed `6351f83`. `PERSON_2_NAME` still reads "Her".
 
 Replace the two `00000000-0000-0000-0000-000000000000` placeholders, and set
 `FIREBASE_PROJECT_ID` to the `project_id` from B4 — it must match that JSON
@@ -159,7 +159,7 @@ cat ~/secrets/love-button-sa.json | tr -d '\n' | wrangler secret put FCM_SERVICE
 
 The `tr -d '\n'` matters — the JSON has to arrive as one line.
 
-- [ ] **C7. Create the schema on the live database**
+- [x] **C7. Create the schema on the live database** — done: `devices` and `sends` live on Cloudflare
 
 ```bash
 npm run migrate:remote
