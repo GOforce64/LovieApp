@@ -201,7 +201,7 @@ China builds end `.CN`. **A China ROM has no Play Services and FCM cannot work
 there at all** — no push, no workaround, project over. Check this before anything
 else on the phones.
 
-- [ ] **D2. Developer options and USB debugging — both phones (HyperOS)**
+- [x] **D2. Developer options and USB debugging — both phones (HyperOS)** — phone A over USB, phone B over wireless debugging
 
 HyperOS renamed the tap target. It is **OS version**, not "MIUI version".
 
@@ -262,7 +262,7 @@ apiBaseUrl=https://love-button.<your-subdomain>.workers.dev
 A missing value fails the build with that exact instruction rather than silently
 producing an APK that installs and then cannot reach anything.
 
-- [ ] **D4. Verify adb sees both**
+- [x] **D4. Verify adb sees both** — `24115RA8EG` (amethyst_eea, USB) and `21081111RG` (amber_eea, Wi-Fi); both `_eea`, confirming D1
 
 ```bash
 adb devices
