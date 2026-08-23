@@ -1,13 +1,17 @@
 package com.lovebutton.app.device
 
+import android.Manifest
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 
 fun isIgnoringBatteryOptimisations(context: Context): Boolean {
@@ -77,4 +81,44 @@ fun openMiuiBatterySaver(context: Context) {
     ).putExtra("package_name", context.packageName)
         .putExtra("package_label", "Love Button")
     startOrFallBack(context, intent)
+}
+
+/**
+ * Opens this app's notification settings.
+ *
+ * The only route left once a denial is USER_FIXED: at that point Android will
+ * never show the permission dialog again, so asking is a silent no-op and the
+ * system settings page is the sole place the user can still say yes.
+ */
+fun openNotificationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    startOrFallBack(context, intent)
+}
+
+/**
+ * Whether the notification permission can no longer be asked for.
+ *
+ * Only meaningful **after** a request attempt. `shouldShowRequestPermissionRationale`
+ * is false both before the first ask and after a permanent denial, so it cannot
+ * tell those apart on its own — but once a request has just returned "denied",
+ * false means no dialog was shown and none ever will be again.
+ */
+fun isNotificationPermissionPermanentlyDenied(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+    val activity = context.findActivity() ?: return false
+    return !ActivityCompat.shouldShowRequestPermissionRationale(
+        activity,
+        Manifest.permission.POST_NOTIFICATIONS,
+    )
+}
+
+/** Compose hands out a ContextWrapper, not the Activity the permission API needs. */
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }

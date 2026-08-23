@@ -16,20 +16,26 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.lovebutton.app.device.areNotificationsEnabled
 import com.lovebutton.app.device.isIgnoringBatteryOptimisations
+import com.lovebutton.app.device.isNotificationPermissionPermanentlyDenied
 import com.lovebutton.app.device.isProbablyXiaomi
 import com.lovebutton.app.device.openAppSettings
 import com.lovebutton.app.device.openBatteryOptimisationSettings
 import com.lovebutton.app.device.openMiuiAutostart
 import com.lovebutton.app.device.openMiuiBatterySaver
+import com.lovebutton.app.device.openNotificationSettings
 
 /**
  * The delivery setup checklist.
@@ -50,9 +56,31 @@ fun SetupScreen(onDone: () -> Unit) {
     val notificationsOn = remember(refresh) { areNotificationsEnabled(context) }
     val batteryExempt = remember(refresh) { isIgnoringBatteryOptimisations(context) }
 
+    // Re-read on every return to the foreground. Sending the user to a settings
+    // page yields no result callback, so without this the ticks stay stale until
+    // something else happens to recompose — and spec 8 wants the check repeated
+    // on every launch anyway, so a HyperOS update that silently undoes the setup
+    // is caught here rather than by a message that never arrives.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refresh++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { refresh++ }
+    ) { granted ->
+        refresh++
+        // Once a denial is USER_FIXED, launch() shows no dialog and returns denied
+        // immediately — so without this the button silently does nothing in exactly
+        // the state where the user needs it. Send them where they can still say yes.
+        if (!granted && isNotificationPermissionPermanentlyDenied(context)) {
+            openNotificationSettings(context)
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
