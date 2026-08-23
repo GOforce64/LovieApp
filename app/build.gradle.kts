@@ -1,3 +1,26 @@
+import java.util.Properties
+
+/**
+ * The Worker's base URL, read from `local.properties` rather than committed.
+ *
+ * The deployed URL contains the account's workers.dev subdomain, which is
+ * derived from a personal email address — this repo is public, so it stays out
+ * of git. `local.properties` is already gitignored for the SDK path.
+ *
+ * Missing value fails the build on purpose. Defaulting to a placeholder would
+ * produce an APK that installs cleanly and then fails at enrolment with a
+ * network error, sending the reader off to debug a Worker that is fine.
+ */
+val apiBaseUrl: String = Properties().run {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+    getProperty("apiBaseUrl") ?: throw GradleException(
+        "apiBaseUrl is missing from local.properties. Add this line:\n" +
+            "    apiBaseUrl=https://love-button.<your-subdomain>.workers.dev\n" +
+            "See docs/MANUAL-SETUP.md block D3."
+    )
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +40,8 @@ android {
         versionCode = 1
         versionName = "0.1"
 
-        // The Worker's base URL. Replaced with the real deployment URL in Task 6.
-        buildConfigField("String", "API_BASE_URL", "\"https://example.invalid\"")
+        // Supplied via local.properties; see the apiBaseUrl block above.
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
