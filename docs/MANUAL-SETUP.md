@@ -88,7 +88,7 @@ Skip the SHA-1 field; nothing here uses Google sign-in.
 Put it at `app/google-services.json` (the repo has a `.example` next to it showing
 the shape). It is gitignored.
 
-- [ ] **B4. Generate the service account key**
+- [x] **B4. Generate the service account key** — at `~/secrets/love-button-sa.json` (mode 600), project_id verified against wrangler.toml
 
 Project settings → Service accounts → **Generate new private key**.
 
@@ -138,7 +138,7 @@ While you're in the file, decide what `PERSON_2_NAME` should say. It's currently
 
 These three values are **not secrets** — they're safe in a public repo.
 
-- [ ] **C5. Generate the two enrolment codes**
+- [x] **C5. Generate the two enrolment codes** — 48 hex chars each, in the password manager
 
 ```bash
 openssl rand -hex 24   # ENROLL_CODE_1 — yours
@@ -148,7 +148,7 @@ openssl rand -hex 24   # ENROLL_CODE_2 — hers
 **Put both in a password manager now.** The server stores only a hash. If you lose
 them you cannot re-enrol a phone after a factory reset without redeploying new ones.
 
-- [ ] **C6. Set the three secrets**
+- [x] **C6. Set the three secrets** — all three confirmed via `wrangler secret list`
 
 ```bash
 cd server
@@ -166,6 +166,12 @@ npm run migrate:remote
 ```
 
 This has never been run. The tables exist only in the test runner's memory today.
+
+- [ ] **C8a. Register a workers.dev subdomain** — BLOCKING, browser only
+
+The account has none, so the Worker uploads but is not routable. Pick a name at
+<https://dash.cloudflare.com/6e56cb1367dbbeb13c47862d133466f2/workers/onboarding>.
+It is global and effectively permanent.
 
 - [ ] **C8. Deploy**
 
