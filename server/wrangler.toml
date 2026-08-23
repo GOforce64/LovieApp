@@ -3,23 +3,19 @@ main = "src/index.ts"
 compatibility_date = "2026-01-01"
 
 [vars]
-FIREBASE_PROJECT_ID = "your-firebase-project-id"
+FIREBASE_PROJECT_ID = "lovieapp-b4068"
 PERSON_1_NAME = "Giorgos"
 PERSON_2_NAME = "Her"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "love-button"
-# Placeholder — Task 0 has not been run yet. Replace with the real D1
-# database id (from `wrangler d1 create love-button`) before `wrangler deploy`.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "2bf232d6-01d3-4224-aa45-435433e10f60"
 migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "TOKEN_CACHE"
-# Placeholder — Task 0 has not been run yet. Replace with the real KV
-# namespace id (from `wrangler kv namespace create`) before `wrangler deploy`.
-id = "00000000-0000-0000-0000-000000000000"
+id = "939528e726af44d2b7cd9eeb630e4a02"
 
 [triggers]
 crons = []
