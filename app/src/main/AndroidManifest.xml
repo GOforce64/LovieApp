@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+ requires the user to grant notification posting explicitly. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS to be honoured.
+         Without it the system refuses the intent and the Setup screen silently
+         falls back to the app's own settings page. Play restricts this permission;
+         this app is sideloaded, so that restriction does not apply. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".LoveButtonApp"

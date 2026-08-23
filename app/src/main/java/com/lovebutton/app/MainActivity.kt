@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.ui.EnrolScreen
+import com.lovebutton.app.ui.HomeScreen
+import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
 
 class MainActivity : ComponentActivity() {
@@ -48,6 +49,7 @@ private fun Root() {
     val prefs = remember { Prefs(context) }
     val enrolment by prefs.enrolment.collectAsState(initial = null)
     var loaded by remember { mutableStateOf(false) }
+    var showSetup by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         prefs.current()
@@ -59,8 +61,10 @@ private fun Root() {
             CircularProgressIndicator()
         }
         enrolment == null -> EnrolScreen(onEnrolled = { /* state flow re-emits */ })
-        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Paired with ${enrolment!!.partnerName}")
-        }
+        showSetup -> SetupScreen(onDone = { showSetup = false })
+        else -> HomeScreen(
+            partnerName = enrolment!!.partnerName,
+            onOpenSetup = { showSetup = true },
+        )
     }
 }
