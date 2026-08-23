@@ -187,7 +187,7 @@ Expected: `{"ok":true}`. Anything else — stop and fix before Block D.
 
 ## Block D — Phones
 
-- [ ] **D1. Confirm both phones are Global/EEA ROM, not China ROM**
+- [x] **D1. Confirm both phones are Global/EEA ROM, not China ROM** — confirmed 2026-08-23: both EEA.
 
 Settings → About phone → build number. Global builds end `.MIXM` or `.EUXM`;
 China builds end `.CN`. **A China ROM has no Play Services and FCM cannot work
