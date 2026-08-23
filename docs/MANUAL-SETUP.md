@@ -167,13 +167,14 @@ npm run migrate:remote
 
 This has never been run. The tables exist only in the test runner's memory today.
 
-- [ ] **C8a. Register a workers.dev subdomain** — BLOCKING, browser only
+- [x] **C8a. Subdomain** — resolved, but not the way the plan expected
 
-The account has none, so the Worker uploads but is not routable. Pick a name at
-<https://dash.cloudflare.com/6e56cb1367dbbeb13c47862d133466f2/workers/onboarding>.
-It is global and effectively permanent.
+The account subdomain is `<your-email-local-part>`, and Cloudflare exposes no way
+to change it (the API replies "Account already has an associated subdomain", and
+the dashboard shows only the Worker's own routes). Since this repo is public, the
+URL is kept **out of git** instead — see D3.
 
-- [ ] **C8. Deploy**
+- [x] **C8. Deploy** — live, `/health` returns `{"ok":true}`; 401 on a bogus bearer, 403 on a wrong code
 
 ```bash
 npm run deploy
@@ -200,17 +201,47 @@ China builds end `.CN`. **A China ROM has no Play Services and FCM cannot work
 there at all** — no push, no workaround, project over. Check this before anything
 else on the phones.
 
-- [ ] **D2. Enable USB debugging on both**
+- [ ] **D2. Developer options and USB debugging — both phones (HyperOS)**
 
-Settings → About phone → tap "MIUI version" 7× → Developer options → USB debugging.
-On Xiaomi you also need **"Install via USB"**, which requires being signed into a
-Mi account and can sit on a 7-day / 96-hour cooldown for a new one. Start this
-early — it's the step most likely to cost you a day.
+HyperOS renamed the tap target. It is **OS version**, not "MIUI version".
 
-- [ ] **D3. Point the app at the Worker**
+1. **Settings → About phone → tap "OS version" seven times** → "You are now a developer".
+2. **Settings → Additional settings → Developer options** — that is where Xiaomi hides it, not under System.
+3. Turn on **USB debugging**.
+4. Turn on **Install via USB**. This is the one that fights back:
+   - It requires being **signed into a Mi account** on the phone.
+   - A **newly created** Mi account can be gated for up to **96 hours**. Nothing
+     works around this. Create the accounts first if you have not.
+   - Some regions additionally want a **SIM inserted** and mobile data on for a
+     moment while the toggle is confirmed.
+5. Turn on **USB debugging (Security settings)** if present — separate from plain
+   USB debugging, and some install paths need it.
+6. Plug the phone in and set the USB mode to **File Transfer / MTP**. On Xiaomi,
+   "Charging only" silently blocks adb — the device simply never appears.
+7. On the phone, accept **"Allow USB debugging?"** and tick **"Always allow from
+   this computer"**. Without the tick you re-accept on every reconnect.
 
-In `app/build.gradle.kts` line 21, replace `https://example.invalid` with the URL
-from C8.
+**Yes — plug both phones into the PC at once.** `adb` handles multiple devices
+fine; it only needs disambiguating when you act on one:
+
+```bash
+adb devices -l                 # both serials
+adb -s <serial> install app/build/outputs/apk/debug/app-debug.apk
+```
+
+Without `-s`, adb refuses with "more than one device" rather than guessing.
+
+- [x] **D3. Point the app at the Worker** — done, via `local.properties`
+
+`API_BASE_URL` is read from `local.properties` (gitignored) rather than committed,
+because the URL embeds a personal email handle and this repo is public. The line:
+
+```properties
+apiBaseUrl=https://love-button.<your-subdomain>.workers.dev
+```
+
+A missing value fails the build with that exact instruction rather than silently
+producing an APK that installs and then cannot reach anything.
 
 - [ ] **D4. Verify adb sees both**
 
