@@ -4,8 +4,8 @@ compatibility_date = "2026-01-01"
 
 [vars]
 FIREBASE_PROJECT_ID = "lovieapp-b4068"
-PERSON_1_NAME = "Giorgos"
-PERSON_2_NAME = "Her"
+PERSON_1_NAME = "Hubby"
+PERSON_2_NAME = "Wifey"
 
 [[d1_databases]]
 binding = "DB"
