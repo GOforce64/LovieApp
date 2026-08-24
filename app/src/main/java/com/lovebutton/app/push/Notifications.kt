@@ -18,6 +18,21 @@ import java.util.concurrent.atomic.AtomicInteger
 private val notificationCounter = AtomicInteger(1)
 
 /**
+ * Builds a channel's sound URI from the resource NAME, never its numeric id.
+ *
+ * Resource ids are not stable across builds: adding resources renumbers them.
+ * A channel stores whatever URI it was created with and can never be changed,
+ * so an id-based URI silently stops resolving the moment the numbering shifts —
+ * and Android's response to an unresolvable sound is no sound at all, with no
+ * error anywhere. This form survives any renumbering.
+ *
+ * The caller passes an entry name derived from a compile-checked R.raw constant,
+ * so a missing file is still caught at build time rather than becoming a typo.
+ */
+internal fun soundUriString(packageName: String, entryName: String): String =
+    "android.resource://$packageName/raw/$entryName"
+
+/**
  * Creates the four real channels and deletes the retired development one.
  *
  * Creating a channel that already exists is a no-op, so this is safe on every
@@ -48,7 +63,12 @@ fun ensureChannels(context: Context) {
             description = "Sound for \"${message.text}\""
             enableVibration(true)
             setSound(
-                Uri.parse("android.resource://${context.packageName}/${message.soundRes}"),
+                Uri.parse(
+                    soundUriString(
+                        context.packageName,
+                        context.resources.getResourceEntryName(message.soundRes),
+                    )
+                ),
                 attributes,
             )
         }
