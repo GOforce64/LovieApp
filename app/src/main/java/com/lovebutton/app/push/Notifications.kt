@@ -4,36 +4,56 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
 import android.app.PendingIntent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.lovebutton.app.MainActivity
 import com.lovebutton.app.data.DEV_CHANNEL_ID
+import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.data.messageForId
 import java.util.concurrent.atomic.AtomicInteger
 
 private val notificationCounter = AtomicInteger(1)
 
 /**
- * Creates the temporary development channel.
+ * Creates the four real channels and deletes the retired development one.
  *
- * Android freezes a channel's sound at creation and will not let you change it
- * afterwards. The four real sounds are not chosen until milestone 4, so this uses
- * a throwaway channel id that milestone 4 deletes — creating `msg_1` now would
- * permanently weld the default sound to it.
+ * Creating a channel that already exists is a no-op, so this is safe on every
+ * launch. Deleting `dev_buzz_v1` is safe for the opposite reason: it was created
+ * as a throwaway precisely so that the `msg_N` ids would still be unburnt when
+ * the sounds were finalised.
+ *
+ * A channel's sound is frozen at creation and cannot be changed afterwards
+ * (spec 6.3). Changing one later means deleting the channel, which resets her
+ * notification settings visibly. These four are permanent.
  */
-fun ensureChannel(context: Context) {
-    val channel = NotificationChannel(
-        DEV_CHANNEL_ID,
-        "Messages (temporary)",
-        NotificationManager.IMPORTANCE_HIGH,
-    ).apply {
-        description = "Provisional channel used until the real sounds are chosen."
-        enableVibration(true)
-    }
+fun ensureChannels(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
 
-    context.getSystemService(NotificationManager::class.java)
-        .createNotificationChannel(channel)
+    manager.deleteNotificationChannel(DEV_CHANNEL_ID)
+
+    val attributes = AudioAttributes.Builder()
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+        .build()
+
+    MESSAGES.forEach { message ->
+        val channel = NotificationChannel(
+            message.channelId,
+            message.text,
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Sound for \"${message.text}\""
+            enableVibration(true)
+            setSound(
+                Uri.parse("android.resource://${context.packageName}/${message.soundRes}"),
+                attributes,
+            )
+        }
+        manager.createNotificationChannel(channel)
+    }
 }
 
 /**

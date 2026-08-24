@@ -1,10 +1,11 @@
 package com.lovebutton.app
 
-import com.lovebutton.app.data.DEV_CHANNEL_ID
 import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.data.messageForId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MessagesTest {
@@ -39,11 +40,28 @@ class MessagesTest {
     }
 
     @Test
-    fun `every message uses the temporary dev channel for now`() {
-        // Channel sounds are frozen at creation (spec 6.3), so the real per-message
-        // channels are not created until their sounds are final in milestone 4.
+    fun `each message has its own channel id`() {
+        // Spec 6.3: one channel per message, because the sound is a property of the
+        // channel. A shared channel would mean a shared sound.
+        assertEquals(listOf("msg_1", "msg_2", "msg_3", "msg_4"), MESSAGES.map { it.channelId })
+        assertEquals(4, MESSAGES.map { it.channelId }.toSet().size)
+    }
+
+    @Test
+    fun `each message has its own sound resource`() {
+        // A zero resource id means the raw file is missing or misnamed, which would
+        // silently produce a channel with the default sound — and that cannot be
+        // fixed afterwards without deleting the channel.
         MESSAGES.forEach { message ->
-            assertEquals(DEV_CHANNEL_ID, message.channelId)
+            assertNotEquals("message ${message.id} has no sound", 0, message.soundRes)
         }
+        assertEquals(4, MESSAGES.map { it.soundRes }.toSet().size)
+    }
+
+    @Test
+    fun `channel ids do not collide with the retired dev channel`() {
+        // dev_buzz_v1 is deleted at startup. If a real channel reused that id it
+        // would be deleted along with it on every launch.
+        assertTrue(MESSAGES.none { it.channelId == "dev_buzz_v1" })
     }
 }
