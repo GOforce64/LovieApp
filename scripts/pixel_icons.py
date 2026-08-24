@@ -224,17 +224,49 @@ def svg_tile(cells, n, ox, oy, colour, span):
         f'height="{unit:.2f}" fill="{colour}"/>'
         for y in range(n) for x in range(n) if cells[y][x])
 
-def half(solid, sil, holes, n):
-    """A mid-fill frame: outlined all round, interior filled from the bottom up.
+# How each icon's mid-fill frame grows. The direction is per icon because what
+# reads as "filling" depends on the shape: a heart blooms from its centre, a
+# speech bubble closes in from its edge.
+FILL_MODE = {
+    "heart": "centre",
+    "bubble": "inward",
+    "paw": "up",
+    "call": "up",
+}
+
+def half(solid, sil, holes, n, mode="up"):
+    """A mid-fill frame: outlined all round, interior partly filled.
 
     RemoteViews cannot animate, but Android 12+ tweens a widget's content change,
     so an intermediate frame between outline and filled reads as the icon filling
     rather than as two unrelated pictures.
     """
     border = outline(sil, n)
-    cut = n // 2
-    interior = [[solid[y][x] and not border[y][x] and y >= cut and not holes[y][x]
-                 for x in range(n)] for y in range(n)]
+    inner = [[solid[y][x] and not border[y][x] and not holes[y][x]
+              for x in range(n)] for y in range(n)]
+
+    cx = cy = (n - 1) / 2.0
+    # Radius covering half the interior cells, so every mode fills a comparable
+    # amount and the three frames read as one even sequence.
+    cells = [(y, x) for y in range(n) for x in range(n) if inner[y][x]]
+    target = max(1, len(cells) // 2)
+
+    if mode == "centre":
+        ranked = sorted(cells, key=lambda c: (c[0]-cy)**2 + (c[1]-cx)**2)
+    elif mode == "inward":
+        # distance to the nearest empty cell: the rim of the shape fills first
+        def depth(c):
+            y, x = c
+            return min((abs(y-yy) + abs(x-xx))
+                       for yy in range(n) for xx in range(n)
+                       if not sil[yy][xx]) if any(
+                           not sil[yy][xx] for yy in range(n) for xx in range(n)) else 0
+        ranked = sorted(cells, key=depth)
+    else:  # "up" — from the bottom
+        ranked = sorted(cells, key=lambda c: -c[0])
+
+    chosen = set(ranked[:target])
+    interior = [[(y, x) in chosen for x in range(n)] for y in range(n)]
     return border, interior
 
 def build(icons, outdir, title):
@@ -260,7 +292,7 @@ def build(icons, outdir, title):
                 for cells, colour in ((i, FILL), (b, BORDER), (sh, SHINE)):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant.startswith("half"):
-                hb, hi = half(solid, sil, holes, n)
+                hb, hi = half(solid, sil, holes, n, FILL_MODE.get(key, "up"))
                 for cells, colour in ((hi, FILL), (hb, BORDER)):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             else:
@@ -279,7 +311,7 @@ def build(icons, outdir, title):
             vector_drawable([(i, FILL), (b, BORDER), (sh, SHINE)], n))
         open(os.path.join(outdir, f"ic_{key}_outline.xml"), "w").write(
             vector_drawable([(union(outline(sil, n), holes, n), IDLE)], n))
-        hb, hi = half(solid, sil, holes, n)
+        hb, hi = half(solid, sil, holes, n, FILL_MODE.get(key, "up"))
         open(os.path.join(outdir, f"ic_{key}_half.xml"), "w").write(
             vector_drawable([(hi, FILL), (hb, BORDER)], n))
     print(f"{title}: {len(icons)*2} drawables + preview.svg -> {outdir}")
