@@ -1213,3 +1213,60 @@ Deferred to Plan 4, as the design states: `/v1/receipts`, Delivered and Seen, th
 **3. Type consistency:** `LoveMessage` gains `soundRes` in Task 1 and is read as `message.soundRes` in the same task only. `ensureChannel` → `ensureChannels` is renamed in Task 1 and its single caller updated in the same task. `KEY_STATE` and `KEY_MSG_ID` are defined in Task 3 and used in Tasks 4 and 5. `setWidgetState(context, appWidgetId, state)` is defined in Task 4 and revised in Task 5 Step 6 with the same signature. `SendWorker.enqueue` gains a third parameter with a default in Task 4, so Plan 2's existing two-argument call site in `HomeScreen.kt` still compiles.
 
 **4. Known risk:** Task 3 writes `SendAction` in a form Task 4 immediately rewrites. This is deliberate — Task 3 must build and be reviewable on its own, and a tap that sends without updating the tile is honest behaviour rather than a stub.
+
+---
+
+## Results — 2026-08-24
+
+Executed inline. All six tasks complete; 20 unit tests passing.
+
+**Verified on hardware (both phones):** four channels with four distinct sounds,
+correct in both directions and identical after a reinstall; four separate widget
+entries in the launcher; each widget sends its own message; notifications stack;
+widgets survive the host being swiped from recents; and, after the fix below,
+widgets render and send correctly following a reboot.
+
+**Task 6 Step 5 (the unenrolled tile) was not run.** It costs a re-enrolment on a
+phone, and the plan already treats a gap there as something to record for Plan 4
+rather than fix here. Still unverified: whether an unenrolled tile renders dimmed
+and opens the app, or attempts a send and shows failed.
+
+### Three defects found on hardware, none of which a unit test would have caught
+
+**1. Channel sounds addressed by numeric resource id.** Task 1 built the sound URI
+as `android.resource://<pkg>/<numeric id>`. Resource ids are not stable across
+builds: adding the twelve widget drawables in Task 5 shifted the `raw` block from
+`0x7f09` to `0x7f0b`, so every channel pointed at an id that no longer existed.
+Android plays nothing for an unresolvable sound URI and logs nothing — it presented
+as vibration without sound. Diagnosed by comparing the ids stored in `dumpsys`
+against the build's `R.txt`, not by reasoning.
+
+Task 1's verification was the weak link: it confirmed the ids matched *at that
+moment*, which was true and insufficient. The check had to be that the URI *form*
+was stable. `SoundUriTest` now asserts exactly that. Because channel sound is frozen
+at creation the four channels could not be repaired, and the app had to be
+uninstalled on both phones to free the ids.
+
+**2. `setWidgetState` hardcoded `LoveWidget().update()`.** Introduced in Task 4 when
+only one widget existed, it would have written correct state for the other three and
+then silently redrawn nothing. Caught while writing Task 5, before it could ship.
+
+**3. No widget redraw after a reboot.** Glance draws only when its receiver runs, and
+nothing re-renders the tiles at boot. They sat on the loading layout indefinitely,
+and a tap on an unrendered tile falls through to the host's default — which opens the
+app, which is what appeared to fix it. `BootReceiver` now redraws all four on
+`BOOT_COMPLETED`. Autostart was already enabled on both phones, so the receiver's
+absence was the whole cause.
+
+### Deviations from the plan, at the user's direction
+
+- **The tile is icon-only** — no background, no label — overriding spec §7's "label
+  small underneath". State therefore lives in the artwork rather than in a background
+  colour, as three fill stages plus a grey tint for failed.
+- **A `half` fill stage was added** per icon so the tile reads as filling rather than
+  as two unrelated pictures. Direction is per icon: the heart blooms from its centre,
+  the bubble lights its perimeter, the paw and letters fill upward.
+- **A network-constrained send holds SENDING rather than failing.** WorkManager does
+  not run a worker whose constraints are unmet, so nothing writes FAILED. This is
+  correct — the send is queued, not lost, and lands when the network returns — and
+  was left as is deliberately.
