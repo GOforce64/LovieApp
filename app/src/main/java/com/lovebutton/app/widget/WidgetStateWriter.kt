@@ -25,5 +25,13 @@ suspend fun setWidgetState(context: Context, appWidgetId: Int, state: WidgetStat
     updateAppWidgetState(context, glanceId) { prefs ->
         prefs[KEY_STATE] = state.name
     }
-    LoveWidget().update(context, glanceId)
+
+    // Each widget class owns its own instances, so the redraw has to go through
+    // the class that actually holds this id. Asking the wrong one writes the
+    // state and then quietly draws nothing.
+    listOf(LoveWidget(), ThinkingWidget(), MissWidget(), CallWidget()).forEach { widget ->
+        if (glanceId in manager.getGlanceIds(widget.javaClass)) {
+            widget.update(context, glanceId)
+        }
+    }
 }

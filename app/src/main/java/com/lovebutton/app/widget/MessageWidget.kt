@@ -95,15 +95,24 @@ private fun tintFor(state: WidgetState) = when (state) {
 
 private fun outlineIconFor(msgId: Int): Int = when (msgId) {
     1 -> R.drawable.ic_heart_outline
+    2 -> R.drawable.ic_bubble_outline
+    3 -> R.drawable.ic_paw_outline
+    4 -> R.drawable.ic_call_outline
     else -> R.drawable.ic_heart_outline
 }
 
 private fun halfIconFor(msgId: Int): Int = when (msgId) {
     1 -> R.drawable.ic_heart_half
+    2 -> R.drawable.ic_bubble_half
+    3 -> R.drawable.ic_paw_half
+    4 -> R.drawable.ic_call_half
     else -> R.drawable.ic_heart_half
 }
 
 private fun filledIconFor(msgId: Int): Int = when (msgId) {
     1 -> R.drawable.ic_heart_filled
+    2 -> R.drawable.ic_bubble_filled
+    3 -> R.drawable.ic_paw_filled
+    4 -> R.drawable.ic_call_filled
     else -> R.drawable.ic_heart_filled
 }

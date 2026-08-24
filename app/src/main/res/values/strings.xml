@@ -3,4 +3,10 @@
     <string name="app_name">Love Button</string>
     <string name="widget_love_label">I love you</string>
     <string name="widget_love_description">Send \"I love you\"</string>
+    <string name="widget_thinking_label">Thinking of you</string>
+    <string name="widget_thinking_description">Send \"Thinking of you\"</string>
+    <string name="widget_miss_label">Miss you</string>
+    <string name="widget_miss_description">Send \"Miss you\"</string>
+    <string name="widget_call_label">Call me</string>
+    <string name="widget_call_description">Send \"Call me when you can\"</string>
 </resources>

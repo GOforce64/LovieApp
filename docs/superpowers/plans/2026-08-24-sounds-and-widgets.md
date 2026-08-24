@@ -938,6 +938,9 @@ The generator is committed so the icons stay editable as ASCII grids rather than
 
 - [ ] **Step 2: Point the icon lookups at the real drawables**
 
+Three lookups, not two — a `half` variant per icon was added during Task 4 so the
+tile reads as filling. The generator emits all three.
+
 In `widget/MessageWidget.kt`, replace both lookup functions:
 
 ```kotlin

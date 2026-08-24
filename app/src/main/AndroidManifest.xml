@@ -49,6 +49,42 @@
                 android:resource="@xml/widget_love" />
         </receiver>
 
+        <receiver
+            android:name=".widget.ThinkingWidgetReceiver"
+            android:label="@string/widget_thinking_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_thinking" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MissWidgetReceiver"
+            android:label="@string/widget_miss_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_miss" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.CallWidgetReceiver"
+            android:label="@string/widget_call_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_call" />
+        </receiver>
+
     </application>
 
 </manifest>
