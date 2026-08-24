@@ -86,8 +86,31 @@ entries in the launcher's picker with their own preview and label. It says nothi
 about separate implementations, and four copies of the ladder would be four places to
 fix every future change.
 
-Icons are Material Symbols (Apache 2.0, no attribution): `favorite`, `chat_bubble`,
-`waving_hand`, `call`, in outline and filled — eight vector drawables.
+Icons are **custom pixel art**, authored as ASCII grids and generated into
+VectorDrawables by `scripts/pixel_icons.py`. Eight drawables: heart, smiley speech
+bubble, cat paw, and the word CALL, each filled and outline.
+
+Three decisions worth keeping:
+
+- **The outline variant is derived, never authored** — a cell touching an empty cell
+  or the border. The pair cannot drift apart when a shape is edited.
+- **Thin shapes are painted as pure fill.** CALL is one pixel thick everywhere, so it
+  has no interior; painting its border would render the whole word in the dark rose
+  while every other icon read as pink. The generator detects an empty interior and
+  drops the border.
+- **Every drawable renders into a 22-unit box inside a 24dp viewport regardless of
+  grid size**, so an 11x11 icon sits optically identical beside a 13x13 one. The set
+  ships at 11x11; the grid is per-icon, so that can change later without touching the
+  rest.
+
+Three colours, one `<path>` each, so any layer can be retinted without redrawing:
+border `#D1447E`, fill `#FF6FA5`, shine `#FFD9E8`. The heart carries a shine on its
+upper-left lobe.
+
+The spec named "waving hand" and "phone" for messages 3 and 4. Both were replaced —
+a hand does not survive an 11x11 grid, and a pixel telephone fights the diagonal.
+A cat paw and the word CALL read instantly at widget size, which is the only thing
+that matters here.
 
 **Tap path:** `ActionCallback` → haptic (`CONFIRM`) → state Sending → enqueue
 `SendWorker`. The haptic fires before the network call starts, which is what makes
@@ -134,7 +157,28 @@ first time rather than coincidentally sounding right.
 
 ---
 
-## 7. Human prerequisites
+## 7. Assets — done, staged outside the repo
 
-Four `.ogg` files, finalised before any channel work begins. Sourcing guidance and
-licence constraints live in `docs/MANUAL-SETUP.md`.
+Both prerequisites are complete and staged at `~/Downloads/love-button-assets/`.
+Task 1 of the plan places them; nothing is in `res/` yet.
+
+**Sounds** — sourced by Giorgos, then trimmed, peak-matched, faded and encoded:
+
+| File | Message | Duration | Peak |
+|---|---|---|---|
+| `love.ogg` | I love you | 0.31s | -2.5 dB |
+| `thinking.ogg` | Thinking of you | 0.50s | -1.8 dB |
+| `miss.ogg` | Miss you | 1.13s | -2.9 dB |
+| `call.ogg` | Call me | 1.04s | -2.5 dB |
+
+Every source began with up to half a second of silence, which on this product is pure
+latency — the buzz is the whole point, and a beat of nothing before it is felt even if
+it is not noticed. All four now start on the first sample.
+
+Normalisation is **peak-based, not LUFS**. EBU R128 needs roughly three seconds to
+integrate and these are sub-second clips, so `loudnorm` was operating on meaningless
+measurements; peak matching is what applies at this length. `miss.ogg` sits 1 dB below
+the rest by ear, because a sustained voice reads louder than a transient at equal peak.
+
+**Icons** — eight VectorDrawables plus the generator, to be committed as
+`scripts/pixel_icons.py` so the grids stay editable rather than the XML.
