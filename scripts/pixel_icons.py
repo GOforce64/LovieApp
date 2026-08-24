@@ -229,7 +229,7 @@ def svg_tile(cells, n, ox, oy, colour, span):
 # speech bubble closes in from its edge.
 FILL_MODE = {
     "heart": "centre",
-    "bubble": "inward",
+    "bubble": "perimeter",
     "paw": "up",
     "call": "up",
 }
@@ -244,6 +244,9 @@ def half(solid, sil, holes, n, mode="up"):
     border = outline(sil, n)
     inner = [[solid[y][x] and not border[y][x] and not holes[y][x]
               for x in range(n)] for y in range(n)]
+
+    if mode == "perimeter":
+        return [(border, FILL)]
 
     cx = cy = (n - 1) / 2.0
     # Radius covering half the interior cells, so every mode fills a comparable
@@ -267,7 +270,12 @@ def half(solid, sil, holes, n, mode="up"):
 
     chosen = set(ranked[:target])
     interior = [[(y, x) in chosen for x in range(n)] for y in range(n)]
-    return border, interior
+    if mode == "perimeter":
+        # The outline lit up rather than partly filled: the rim switches from the
+        # muted idle colour to the full fill colour, so the frame reads as the
+        # shape waking up before it fills.
+        return [(border, FILL)]
+    return [(interior, FILL), (border, BORDER)]
 
 def build(icons, outdir, title):
     os.makedirs(outdir, exist_ok=True)
@@ -292,8 +300,7 @@ def build(icons, outdir, title):
                 for cells, colour in ((i, FILL), (b, BORDER), (sh, SHINE)):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant.startswith("half"):
-                hb, hi = half(solid, sil, holes, n, FILL_MODE.get(key, "up"))
-                for cells, colour in ((hi, FILL), (hb, BORDER)):
+                for cells, colour in half(solid, sil, holes, n, FILL_MODE.get(key, "up")):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             else:
                 svg.append(svg_tile(union(outline(sil, n), holes, n), n, ox, oy, IDLE, span))
@@ -311,9 +318,8 @@ def build(icons, outdir, title):
             vector_drawable([(i, FILL), (b, BORDER), (sh, SHINE)], n))
         open(os.path.join(outdir, f"ic_{key}_outline.xml"), "w").write(
             vector_drawable([(union(outline(sil, n), holes, n), IDLE)], n))
-        hb, hi = half(solid, sil, holes, n, FILL_MODE.get(key, "up"))
         open(os.path.join(outdir, f"ic_{key}_half.xml"), "w").write(
-            vector_drawable([(hi, FILL), (hb, BORDER)], n))
+            vector_drawable(half(solid, sil, holes, n, FILL_MODE.get(key, "up")), n))
     print(f"{title}: {len(icons)*2} drawables + preview.svg -> {outdir}")
 
 if __name__ == "__main__":
