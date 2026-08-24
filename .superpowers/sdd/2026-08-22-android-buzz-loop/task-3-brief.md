@@ -1,0 +1,375 @@
+## Task 3: API models and client
+
+**Files:**
+- Create: `app/src/main/java/com/lovebutton/app/data/ApiModels.kt`
+- Create: `app/src/main/java/com/lovebutton/app/data/LoveButtonApi.kt`
+- Create: `app/src/test/java/com/lovebutton/app/LoveButtonApiTest.kt`
+
+**Interfaces:**
+- Consumes: nothing
+- Produces:
+  - `class LoveButtonApi(baseUrl: String, client: OkHttpClient = OkHttpClient())`
+  - `suspend fun enrol(code: String, fcmToken: String, label: String): EnrolResult`
+  - `suspend fun registerDevice(authToken: String, fcmToken: String): Boolean`
+  - `suspend fun send(authToken: String, msgId: Int): SendResult`
+  - `sealed interface EnrolResult { data class Ok(...); data object InvalidCode; data object RateLimited; data class Failed(val message: String) }`
+  - `data class SendResult(val sendId: String, val delivered: Int)`
+
+- [ ] **Step 1: Write the failing test**
+
+`app/src/test/java/com/lovebutton/app/LoveButtonApiTest.kt`:
+
+```kotlin
+package com.lovebutton.app
+
+import com.lovebutton.app.data.EnrolResult
+import com.lovebutton.app.data.LoveButtonApi
+import kotlinx.coroutines.runBlocking
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class LoveButtonApiTest {
+
+    private lateinit var server: MockWebServer
+    private lateinit var api: LoveButtonApi
+
+    @Before
+    fun setUp() {
+        server = MockWebServer()
+        server.start()
+        api = LoveButtonApi(server.url("/").toString().removeSuffix("/"))
+    }
+
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+
+    private fun json(body: String, code: Int = 200) =
+        MockResponse().setResponseCode(code)
+            .setHeader("Content-Type", "application/json")
+            .setBody(body)
+
+    @Test
+    fun `enrol posts the code and parses the token`() = runBlocking {
+        server.enqueue(
+            json("""{"device_id":"d1","auth_token":"tok","person":2,"partner_name":"Giorgos"}""")
+        )
+
+        val result = api.enrol("secret-code", "fcm-1", "her phone")
+
+        assertTrue(result is EnrolResult.Ok)
+        result as EnrolResult.Ok
+        assertEquals("tok", result.authToken)
+        assertEquals(2, result.person)
+        assertEquals("Giorgos", result.partnerName)
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/enroll", request.path)
+        assertEquals("application/json", request.getHeader("Content-Type"))
+
+        val sent = request.body.readUtf8()
+        assertTrue(sent.contains("\"code\":\"secret-code\""))
+        assertTrue(sent.contains("\"fcm_token\":\"fcm-1\""))
+    }
+
+    @Test
+    fun `enrol maps 403 to InvalidCode`() = runBlocking {
+        server.enqueue(json("""{"error":"invalid_code","message":"nope"}""", 403))
+
+        assertEquals(EnrolResult.InvalidCode, api.enrol("wrong", "fcm-1", "phone"))
+    }
+
+    @Test
+    fun `enrol maps 429 to RateLimited`() = runBlocking {
+        server.enqueue(json("""{"error":"rate_limited","message":"slow down"}""", 429))
+
+        assertEquals(EnrolResult.RateLimited, api.enrol("code", "fcm-1", "phone"))
+    }
+
+    @Test
+    fun `enrol maps an unexpected status to Failed`() = runBlocking {
+        server.enqueue(json("""{"error":"boom","message":"server exploded"}""", 500))
+
+        val result = api.enrol("code", "fcm-1", "phone")
+
+        assertTrue(result is EnrolResult.Failed)
+    }
+
+    @Test
+    fun `send posts only the message id and never a recipient`() = runBlocking {
+        server.enqueue(json("""{"send_id":"s1","delivered":1}"""))
+
+        val result = api.send("tok", 3)
+
+        assertEquals("s1", result.sendId)
+        assertEquals(1, result.delivered)
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/send", request.path)
+        assertEquals("Bearer tok", request.getHeader("Authorization"))
+
+        // Invariant 2 lives on the server, but the client must not even try to
+        // name a recipient — if this body ever grows a to_person field, the
+        // server ignores it and this test is the reminder of why.
+        val sent = request.body.readUtf8()
+        assertTrue(sent.contains("\"msg_id\":3"))
+        assertFalse(sent.contains("to_person"))
+        assertFalse(sent.contains("from_person"))
+    }
+
+    @Test
+    fun `send reports delivered zero without throwing`() = runBlocking {
+        // The server returns 200 with delivered 0 when her phone has no active
+        // device. That is information, not a failure, and must not raise.
+        server.enqueue(json("""{"send_id":"s2","delivered":0}"""))
+
+        assertEquals(0, api.send("tok", 1).delivered)
+    }
+
+    @Test
+    fun `registerDevice sends the bearer token and reports success`() = runBlocking {
+        server.enqueue(json("""{"ok":true}"""))
+
+        assertTrue(api.registerDevice("tok", "fcm-new"))
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/v1/devices", request.path)
+        assertEquals("Bearer tok", request.getHeader("Authorization"))
+        assertTrue(request.body.readUtf8().contains("\"fcm_token\":\"fcm-new\""))
+    }
+
+    @Test
+    fun `registerDevice reports failure on 401`() = runBlocking {
+        server.enqueue(json("""{"error":"unauthorized","message":"no"}""", 401))
+
+        assertFalse(api.registerDevice("stale-token", "fcm-new"))
+    }
+}
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.lovebutton.app.LoveButtonApiTest"`
+Expected: FAIL — unresolved reference `LoveButtonApi`
+
+- [ ] **Step 3: Write `app/src/main/java/com/lovebutton/app/data/ApiModels.kt`**
+
+```kotlin
+package com.lovebutton.app.data
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class EnrolRequest(
+    val code: String,
+    @SerialName("fcm_token") val fcmToken: String,
+    val label: String,
+)
+
+@Serializable
+data class EnrolResponse(
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("auth_token") val authToken: String,
+    val person: Int,
+    @SerialName("partner_name") val partnerName: String,
+)
+
+@Serializable
+data class DeviceRequest(
+    @SerialName("fcm_token") val fcmToken: String,
+)
+
+/** No recipient field, deliberately. The server derives it (spec section 4). */
+@Serializable
+data class SendRequest(
+    @SerialName("msg_id") val msgId: Int,
+)
+
+@Serializable
+data class SendResponse(
+    @SerialName("send_id") val sendId: String,
+    val delivered: Int,
+)
+
+@Serializable
+data class ApiError(
+    val error: String = "unknown",
+    val message: String = "",
+)
+
+/** What the caller of [LoveButtonApi.send] actually needs. */
+data class SendResult(val sendId: String, val delivered: Int)
+
+/**
+ * Enrolment has three outcomes worth telling apart on screen: it worked, the code
+ * was wrong, or you have tried too many times. Everything else is lumped into
+ * Failed with a message, because there is nothing useful for the user to do about
+ * it beyond try again later.
+ */
+sealed interface EnrolResult {
+    data class Ok(
+        val deviceId: String,
+        val authToken: String,
+        val person: Int,
+        val partnerName: String,
+    ) : EnrolResult
+
+    data object InvalidCode : EnrolResult
+    data object RateLimited : EnrolResult
+    data class Failed(val message: String) : EnrolResult
+}
+```
+
+- [ ] **Step 4: Write `app/src/main/java/com/lovebutton/app/data/LoveButtonApi.kt`**
+
+```kotlin
+package com.lovebutton.app.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.IOException
+
+private val JSON_MEDIA_TYPE = "application/json".toMediaType()
+
+/**
+ * Every call the app makes to the Worker.
+ *
+ * Deliberately small and dependency-light: OkHttp plus kotlinx.serialization, no
+ * Retrofit. There are three endpoints, and being able to read the whole client in
+ * one sitting is worth more here than the boilerplate a framework would save.
+ *
+ * Nothing in this class ever logs `authToken`. It is the only credential the app
+ * holds, and Logcat is readable by anyone with adb.
+ */
+class LoveButtonApi(
+    private val baseUrl: String,
+    private val client: OkHttpClient = OkHttpClient(),
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun post(path: String, body: String, authToken: String?): Request {
+        val builder = Request.Builder()
+            .url("$baseUrl$path")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .header("Content-Type", "application/json")
+
+        if (authToken != null) {
+            builder.header("Authorization", "Bearer $authToken")
+        }
+        return builder.build()
+    }
+
+    private suspend fun execute(request: Request): Response = withContext(Dispatchers.IO) {
+        client.newCall(request).execute()
+    }
+
+    /** Trades an enrolment code for a device bearer token. Called once per phone. */
+    suspend fun enrol(code: String, fcmToken: String, label: String): EnrolResult {
+        val body = json.encodeToString(EnrolRequest(code, fcmToken, label))
+
+        return try {
+            execute(post("/v1/enroll", body, authToken = null)).use { response ->
+                val text = response.body?.string().orEmpty()
+
+                when (response.code) {
+                    200 -> {
+                        val parsed = json.decodeFromString<EnrolResponse>(text)
+                        EnrolResult.Ok(
+                            deviceId = parsed.deviceId,
+                            authToken = parsed.authToken,
+                            person = parsed.person,
+                            partnerName = parsed.partnerName,
+                        )
+                    }
+                    403 -> EnrolResult.InvalidCode
+                    429 -> EnrolResult.RateLimited
+                    else -> EnrolResult.Failed(errorMessage(text, response.code))
+                }
+            }
+        } catch (e: IOException) {
+            EnrolResult.Failed("Could not reach the server. Check your connection.")
+        }
+    }
+
+    /**
+     * Refreshes the FCM token the server pushes to. Returns false when the server
+     * rejects the bearer token, which means this device was deregistered and must
+     * enrol again.
+     */
+    suspend fun registerDevice(authToken: String, fcmToken: String): Boolean {
+        val body = json.encodeToString(DeviceRequest(fcmToken))
+
+        return try {
+            execute(post("/v1/devices", body, authToken)).use { it.isSuccessful }
+        } catch (e: IOException) {
+            false
+        }
+    }
+
+    /**
+     * Sends one message. The body carries a message id and nothing else — there is
+     * no field naming a recipient, because the server derives it.
+     *
+     * Throws on failure so the calling WorkManager job can retry. A `delivered` of
+     * zero is NOT a failure: it means her phone has no active device, which the UI
+     * reports differently from a network error.
+     */
+    suspend fun send(authToken: String, msgId: Int): SendResult {
+        val body = json.encodeToString(SendRequest(msgId))
+
+        execute(post("/v1/send", body, authToken)).use { response ->
+            val text = response.body?.string().orEmpty()
+
+            if (!response.isSuccessful) {
+                throw IOException("send failed: ${errorMessage(text, response.code)}")
+            }
+
+            val parsed = json.decodeFromString<SendResponse>(text)
+            return SendResult(parsed.sendId, parsed.delivered)
+        }
+    }
+
+    private fun errorMessage(text: String, code: Int): String = try {
+        json.decodeFromString<ApiError>(text).message.ifBlank { "HTTP $code" }
+    } catch (e: Exception) {
+        "HTTP $code"
+    }
+}
+```
+
+- [ ] **Step 5: Run the test to verify it passes**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.lovebutton.app.LoveButtonApiTest"`
+Expected: all eight tests PASS
+
+- [ ] **Step 6: Run the full unit test suite**
+
+Run: `./gradlew :app:testDebugUnitTest`
+Expected: all 13 tests PASS (8 new + 5 from Task 2)
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add app/src/main/java/com/lovebutton/app/data/ app/src/test/java/com/lovebutton/app/LoveButtonApiTest.kt
+git commit -m "feat(app): add API models and Worker client"
+```
+
+---
+
