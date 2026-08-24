@@ -11,11 +11,14 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.lovebutton.app.BuildConfig
 import com.lovebutton.app.data.LoveButtonApi
+import com.lovebutton.app.data.PENDING_WINDOW_MS
+import com.lovebutton.app.data.PendingSends
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.widget.WidgetState
 import com.lovebutton.app.widget.holdMillis
 import com.lovebutton.app.widget.setWidgetState
 import kotlinx.coroutines.delay
+import java.util.UUID
 
 /**
  * Performs one send.
@@ -30,6 +33,9 @@ class SendWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
 
+    /** The id minted for this run, needed by settle() to check for a receipt. */
+    private var mintedSendId: String = ""
+
     override suspend fun doWork(): Result {
         val msgId = inputData.getInt(KEY_MSG_ID, -1)
         val appWidgetId = inputData.getInt(KEY_APP_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -39,8 +45,19 @@ class SendWorker(
         val enrolment = Prefs(applicationContext).current()
             ?: return settle(appWidgetId, WidgetState.FAILED, Result.failure())
 
+        val pending = PendingSends(applicationContext)
+        pending.forgetExpired()
+
+        // Minted and recorded BEFORE the request. A receipt can beat the send
+        // response, and a mapping written afterwards would miss it.
+        val sendId = UUID.randomUUID().toString()
+        mintedSendId = sendId
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            pending.remember(sendId, appWidgetId)
+        }
+
         return try {
-            LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId)
+            LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId, sendId)
             // A delivered count of zero still counts as success: the send was
             // recorded, her phone just has no active device right now.
             settle(appWidgetId, WidgetState.SENT, Result.success())
@@ -48,19 +65,35 @@ class SendWorker(
             // The tile says failed while WorkManager retries underneath. Showing
             // SENDING indefinitely would be worse: a tile that never resolves reads
             // as a broken app rather than a failed send.
+            pending.forget(sendId)
             settle(appWidgetId, WidgetState.FAILED, Result.retry())
         }
     }
 
     /**
-     * Shows a terminal state for its hold time, then returns the tile to idle.
+     * Shows a state for its hold time, then returns the tile to idle.
      *
-     * The delay runs inside the worker rather than as a second scheduled job: a
-     * follow-up WorkRequest could be deferred by Doze for minutes, stranding a
-     * tile on "Sent" long after the moment has passed.
+     * SENT is held for the whole pending window rather than four seconds: it is
+     * waiting for a receipt, and dropping to idle sooner would hide a delivered
+     * that was about to arrive.
+     *
+     * A receipt landing first clears the pending entry, so the check below finds
+     * nothing and leaves the tile alone — otherwise this would overwrite the
+     * crimson or gold the receipt just set with idle.
      */
     private suspend fun settle(appWidgetId: Int, state: WidgetState, result: Result): Result {
         setWidgetState(applicationContext, appWidgetId, state)
+
+        if (state == WidgetState.SENT) {
+            delay(PENDING_WINDOW_MS)
+            val pending = PendingSends(applicationContext)
+            if (pending.widgetFor(mintedSendId) != null) {
+                pending.forget(mintedSendId)
+                setWidgetState(applicationContext, appWidgetId, WidgetState.IDLE)
+            }
+            return result
+        }
+
         state.holdMillis?.let { hold ->
             delay(hold)
             setWidgetState(applicationContext, appWidgetId, WidgetState.IDLE)

@@ -27,6 +27,9 @@ data class DeviceRequest(
 @Serializable
 data class SendRequest(
     @SerialName("msg_id") val msgId: Int,
+    // Minted by the app so the send_id -> widget mapping exists before the
+    // request leaves. See the Plan 4 design, section 2.
+    @SerialName("send_id") val sendId: String,
 )
 
 @Serializable

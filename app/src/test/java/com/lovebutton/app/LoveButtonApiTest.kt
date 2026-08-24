@@ -91,7 +91,7 @@ class LoveButtonApiTest {
     fun `send posts only the message id and never a recipient`() = runBlocking {
         server.enqueue(json("""{"send_id":"s1","delivered":1}"""))
 
-        val result = api.send("tok", 3)
+        val result = api.send("tok", 3, sendId = "99999999-8888-4777-8666-555555555555")
 
         assertEquals("s1", result.sendId)
         assertEquals(1, result.delivered)
@@ -116,7 +116,7 @@ class LoveButtonApiTest {
         // device. That is information, not a failure, and must not raise.
         server.enqueue(json("""{"send_id":"s2","delivered":0}"""))
 
-        assertEquals(0, api.send("tok", 1).delivered)
+        assertEquals(0, api.send("tok", 1, sendId = "99999999-8888-4777-8666-555555555556").delivered)
     }
 
     @Test
@@ -137,5 +137,20 @@ class LoveButtonApiTest {
         server.enqueue(json("""{"error":"unauthorized","message":"no"}""", 401))
 
         assertFalse(api.registerDevice("stale-token", "fcm-new"))
+    }
+
+    @Test
+    fun `send includes the client-minted send_id in the body`() {
+        server.enqueue(MockResponse().setBody("""{"send_id":"abc","delivered":1}"""))
+
+        runBlocking { api.send("token", msgId = 2, sendId = "11111111-2222-4333-8444-555555555555") }
+
+        val request = server.takeRequest()
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("11111111-2222-4333-8444-555555555555"))
+        // Invariant 2's client-side half, unchanged: the client picks an id,
+        // never a destination.
+        assertFalse(body.contains("to_person"))
+        assertFalse(body.contains("from_person"))
     }
 }

@@ -98,8 +98,8 @@ class LoveButtonApi(
      * zero is NOT a failure: it means her phone has no active device, which the UI
      * reports differently from a network error.
      */
-    suspend fun send(authToken: String, msgId: Int): SendResult {
-        val body = json.encodeToString(SendRequest(msgId))
+    suspend fun send(authToken: String, msgId: Int, sendId: String): SendResult {
+        val body = json.encodeToString(SendRequest(msgId, sendId))
 
         execute(post("/v1/send", body, authToken)).use { response ->
             val text = response.body.string()
