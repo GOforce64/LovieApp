@@ -289,6 +289,56 @@ Task 6 Step 5 also needs both phones enrolled, one with each code from C5.
 
 ---
 
+## Block E — the four notification sounds (Plan 3)
+
+Needed before any channel code runs. **A channel's sound is frozen at creation**
+(spec 6.3), so creating `msg_1` with a placeholder burns that id permanently —
+fixing it later means deleting the channel, which resets her notification settings
+where she can see it. Finalise all four first.
+
+- [ ] **E1. Find four clips — no attribution required**
+
+| Source | Licence | Notes |
+|---|---|---|
+| [Pixabay sound effects](https://pixabay.com/sound-effects/) | Pixabay Content License | No attribution, commercial use fine. Biggest notification/UI library — start here |
+| [Mixkit](https://mixkit.co/free-sound-effects/) | Mixkit Free License | No attribution. Smaller but well curated |
+| [Kenney](https://kenney.nl/assets) — "Interface Sounds" | CC0 | Public domain. Game-UI flavoured: clean, short, already notification-length |
+| [Freesound](https://freesound.org) filtered to CC0 | mixed | **Check every file individually** — the site mixes CC0 and CC-BY, and the filter is not always right |
+
+Search: `notification`, `chime`, `bell`, `pop`, `ding`, `marimba`, `bloop`.
+
+- [ ] **E2. Choose them against these criteria**
+
+1. **Under about one second.** Longer clips get truncated by the system anyway.
+2. **Distinct in timbre and pitch shape, not just length.** This is the one that
+   matters and the one people get wrong. She will hear these from a pocket, muffled,
+   without looking — two different bells are the same bell through fabric. Aim for
+   four obviously different *kinds* of sound: say a soft chime, a wooden knock, a
+   two-note rise, a single low pluck.
+3. **Not like stock Android or WhatsApp.** A sound that resembles her other
+   notifications defeats the entire point, which is knowing it is you without looking.
+4. **Audition all four back to back, quietly, from another room** before deciding.
+   That is the real listening condition, not headphones at a desk.
+
+- [ ] **E3. Drop them somewhere and say so**
+
+Any format — wav, mp3, flac. Put them in one folder, named so the mapping is
+unambiguous:
+
+```
+love.*      -> msg_1  "I love you"
+thinking.*  -> msg_2  "Thinking of you"
+miss.*      -> msg_3  "Miss you"
+call.*      -> msg_4  "Call me when you can"
+```
+
+Conversion to `.ogg`, trimming and volume-matching are handled from here.
+
+**Verification:** four files, each under a second, and you can tell which is which
+with your eyes shut.
+
+---
+
 ## Two things nothing can fix in code
 
 1. **Force-stopping the app from Settings kills FCM delivery entirely** until she
