@@ -50,8 +50,9 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
     private fun Tile(msgId: Int, state: WidgetState) {
         val message = messageForId(msgId)
         val icon = when (state) {
+            WidgetState.IDLE, WidgetState.FAILED -> outlineIconFor(msgId)
+            WidgetState.SENDING -> halfIconFor(msgId)
             WidgetState.SENT -> filledIconFor(msgId)
-            else -> outlineIconFor(msgId)
         }
 
         Box(
@@ -68,8 +69,8 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
                 provider = ImageProvider(icon),
                 contentDescription = message?.text,
                 // No background and no label, so the icon carries the whole tile.
-                // State therefore has to live in the artwork itself: the filled
-                // variant for SENT, and a tint for the two transient states.
+                // State therefore lives in the artwork: three fill stages, plus a
+                // tint for the one state that has no stage of its own.
                 colorFilter = tintFor(state),
                 modifier = GlanceModifier.fillMaxSize(),
             )
@@ -78,23 +79,28 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
 }
 
 /**
- * State, expressed without a background.
+ * The one state with no fill stage of its own.
  *
- * SENT is the only state that swaps to the filled icon, so it must NOT be tinted —
- * a tint flattens every path to one colour and would throw away the border and the
- * shine that make the filled variant read as "landed". The other three share the
- * outline artwork and are told apart by colour alone.
+ * IDLE, SENDING and SENT are three stages of the same icon filling up, which
+ * Android 12+ tweens between, so the tile reads as filling rather than as three
+ * unrelated pictures. FAILED is not a point on that scale — it is the sequence
+ * abandoned — so it reuses the outline greyed out. Nothing else is tinted: a tint
+ * flattens every path to one colour and would throw away the border and the shine
+ * that make the filled stage read as "landed".
  */
 private fun tintFor(state: WidgetState) = when (state) {
-    WidgetState.IDLE -> null
-    WidgetState.SENDING -> ColorFilter.tint(ColorProvider(Color(0xFFF3CFDD)))
-    WidgetState.SENT -> null
     WidgetState.FAILED -> ColorFilter.tint(ColorProvider(Color(0xFFA9A2AD)))
+    else -> null
 }
 
 private fun outlineIconFor(msgId: Int): Int = when (msgId) {
     1 -> R.drawable.ic_heart_outline
     else -> R.drawable.ic_heart_outline
+}
+
+private fun halfIconFor(msgId: Int): Int = when (msgId) {
+    1 -> R.drawable.ic_heart_half
+    else -> R.drawable.ic_heart_half
 }
 
 private fun filledIconFor(msgId: Int): Int = when (msgId) {
