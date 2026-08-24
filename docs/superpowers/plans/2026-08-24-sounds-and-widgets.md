@@ -448,7 +448,12 @@ If this reports AAR metadata errors mentioning compileSdk 37, the version is wro
 
 - [ ] **Step 3: Copy the heart drawables**
 
+`res/drawable/` does not exist yet — every icon in the app so far has been an
+`@android:drawable` system one — so create it first or the copy silently writes a
+*file* named `drawable` and resource linking fails.
+
 ```bash
+mkdir -p app/src/main/res/drawable
 cp ~/Downloads/love-button-assets/icons/grid-11/ic_heart_filled.xml  app/src/main/res/drawable/
 cp ~/Downloads/love-button-assets/icons/grid-11/ic_heart_outline.xml app/src/main/res/drawable/
 ```
