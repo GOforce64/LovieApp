@@ -303,3 +303,13 @@ Improvement over the plan's Task 10, prompted by the user asking why phone A had
   being killed overnight — the same failure in the direction that stops HER messages
   arriving. Tokens are cached before bed because phone B's wireless adb drops
   overnight, and needing adb in the morning is exactly when it is least available.
+Ruling 14: night 2 of the overnight gate SKIPPED at the user's explicit decision,
+  after the tradeoff was stated. The plan calls for two consecutive nights because
+  MIUI's killer is memory-pressure driven and therefore probabilistic — one quiet
+  night proves the setup CAN hold, not that it does. Accepted because the failure is
+  recoverable and cheap to detect later: the check is one command, the phones are
+  already primed, and the user intends to keep running it at night alongside further
+  development. Recording it so a future silent-delivery failure is read against a
+  known one-night sample rather than a presumed two-night one. Cost if wrong: a
+  delivery failure surfaces during Plan 3 rather than now.
+Task 10: one night PASSED, second night skipped by decision. Plan 2 closed.
