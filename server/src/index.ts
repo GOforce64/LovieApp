@@ -4,6 +4,7 @@ import { fail } from "./http";
 import { enroll } from "./routes/enroll";
 import { devices } from "./routes/devices";
 import { send } from "./routes/send";
+import { receipts } from "./routes/receipts";
 
 const app = new Hono<App>();
 
@@ -17,6 +18,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.route("/v1", enroll);
 app.route("/v1", devices);
 app.route("/v1", send);
+app.route("/v1", receipts);
 
 // Without these two, Hono's built-in handlers answer with text/plain, which
 // breaks the spec's "all responses are JSON" contract on exactly the two paths a
