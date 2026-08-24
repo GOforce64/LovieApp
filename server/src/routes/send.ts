@@ -9,6 +9,23 @@ import { sendPush } from "../fcm";
 
 interface SendBody {
   msg_id?: unknown;
+  send_id?: unknown;
+}
+
+/**
+ * A canonical v4-shaped UUID.
+ *
+ * The app mints the send id so that its `send_id -> widget` mapping exists
+ * before the request leaves, which makes the receipt-beats-response race in
+ * spec §7.1 unreachable rather than merely handled. The id becomes a primary
+ * key, so it is validated rather than trusted: a client that can write
+ * arbitrary keys can collide with rows it does not own.
+ */
+export function isUuid(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  );
 }
 
 /**
@@ -39,18 +56,30 @@ send.post("/send", async (c) => {
     return fail(c, 400, "bad_request", "msg_id must be one of the defined messages.");
   }
 
+  if (body.send_id !== undefined && !isUuid(body.send_id)) {
+    return fail(c, 400, "bad_request", "send_id must be a UUID.");
+  }
+
   const toPerson = recipientOf(device.person);
-  const sendId = crypto.randomUUID();
+  const sendId = (body.send_id as string | undefined) ?? crypto.randomUUID();
   const sentAt = nowSeconds();
 
   // Record the send before pushing. The row is what a receipt correlates
   // against later, and it must exist even if every push fails.
-  await c.env.DB.prepare(
-    `INSERT INTO sends (id, from_person, to_person, msg_id, sent_at)
+  //
+  // INSERT OR IGNORE rather than a SELECT-then-INSERT: two taps racing on the
+  // same id would both pass a prior existence check and the second would
+  // clobber the first. `changes` is the only answer that cannot race.
+  const inserted = await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO sends (id, from_person, to_person, msg_id, sent_at)
      VALUES (?, ?, ?, ?, ?)`,
   )
     .bind(sendId, device.person, toPerson, body.msg_id, sentAt)
     .run();
+
+  if (inserted.meta.changes === 0) {
+    return fail(c, 409, "duplicate_send_id", "That send_id has already been used.");
+  }
 
   const targets = await c.env.DB.prepare(
     "SELECT id, fcm_token FROM devices WHERE person = ? AND fcm_token IS NOT NULL",

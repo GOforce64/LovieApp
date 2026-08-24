@@ -177,4 +177,46 @@ describe("POST /v1/send", () => {
 
     expect(res.status).toBe(401);
   });
+
+  it("accepts a client-minted send_id and uses it as the row id", async () => {
+    interceptFcm(200, { name: "projects/test-project/messages/1" });
+    const id = "11111111-2222-4333-8444-555555555555";
+
+    const res = await send({ msg_id: 1, send_id: id });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ send_id: id });
+
+    const row = await env.DB.prepare("SELECT id FROM sends WHERE id = ?").bind(id).first();
+    expect(row).not.toBeNull();
+  });
+
+  it("rejects a malformed send_id", async () => {
+    // Not merely tidiness: the id becomes a primary key, and a client that can
+    // write arbitrary keys can collide with rows it does not own.
+    const res = await send({ msg_id: 1, send_id: "not-a-uuid" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "bad_request" });
+  });
+
+  it("rejects a send_id that already exists", async () => {
+    interceptFcm(200, { name: "projects/test-project/messages/1" });
+    const id = "99999999-8888-4777-8666-555555555555";
+
+    const first = await send({ msg_id: 1, send_id: id });
+    expect(first.status).toBe(200);
+
+    // A replayed id would otherwise overwrite or silently merge with the first
+    // send, and its receipts would correlate to the wrong tile.
+    const second = await send({ msg_id: 2, send_id: id });
+    expect(second.status).toBe(409);
+    expect(await second.json()).toMatchObject({ error: "duplicate_send_id" });
+  });
+
+  it("still mints a send_id when the client omits one", async () => {
+    interceptFcm(200, { name: "projects/test-project/messages/1" });
+    const res = await send({ msg_id: 1 });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { send_id: string };
+    expect(body.send_id).toMatch(/^[0-9a-f-]{36}$/i);
+  });
 });
