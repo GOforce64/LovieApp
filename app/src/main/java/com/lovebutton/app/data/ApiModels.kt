@@ -39,6 +39,12 @@ data class SendResponse(
 )
 
 @Serializable
+data class ReceiptRequest(
+    @SerialName("send_id") val sendId: String,
+    val state: String,
+)
+
+@Serializable
 data class ApiError(
     val error: String = "unknown",
     val message: String = "",

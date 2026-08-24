@@ -2,6 +2,7 @@ package com.lovebutton.app.push
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.lovebutton.app.work.ReceiptWorker
 import com.lovebutton.app.work.RegisterTokenWorker
 
 /**
@@ -26,7 +27,14 @@ class PushService : FirebaseMessagingService() {
             "msg" -> {
                 val msgId = data["msg_id"]?.toIntOrNull() ?: return
                 val fromName = data["from_name"] ?: "Someone"
-                postMessageNotification(applicationContext, msgId, fromName)
+                val sendId = data["send_id"]
+                postMessageNotification(applicationContext, msgId, fromName, sendId)
+                // After posting, not before: the receipt says "it arrived and she
+                // can see it", and a receipt for a notification that failed to
+                // post would be a lie.
+                if (sendId != null) {
+                    ReceiptWorker.enqueue(applicationContext, sendId, "delivered")
+                }
             }
             // "receipt" arrives in a later plan and must never post a notification.
             else -> Unit

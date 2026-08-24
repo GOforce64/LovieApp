@@ -1,5 +1,6 @@
 package com.lovebutton.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,14 +19,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.lovebutton.app.data.Prefs
+import com.lovebutton.app.push.EXTRA_SEND_ID
 import com.lovebutton.app.ui.EnrolScreen
 import com.lovebutton.app.ui.HomeScreen
 import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
+import com.lovebutton.app.work.ReceiptWorker
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        reportSeenFrom(intent)
         setContent {
             LoveButtonTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -33,6 +37,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // The activity is single-instance in practice: a second tap arrives here
+        // rather than through onCreate, and without this it would never report.
+        setIntent(intent)
+        reportSeenFrom(intent)
+    }
+
+    private fun reportSeenFrom(intent: Intent?) {
+        val sendId = intent?.getStringExtra(EXTRA_SEND_ID) ?: return
+        ReceiptWorker.enqueue(this, sendId, "seen")
+        // Clear it so a configuration change does not report the same tap twice.
+        intent.removeExtra(EXTRA_SEND_ID)
     }
 }
 

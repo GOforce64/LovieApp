@@ -113,6 +113,22 @@ class LoveButtonApi(
         }
     }
 
+    /**
+     * Reports that a message arrived, or that she opened it.
+     *
+     * Returns false rather than throwing on a rejected receipt: the caller is a
+     * Worker whose only options are retry or give up, and a 403 or 404 is not
+     * worth retrying — it means this device is not the recipient, or the send is
+     * gone.
+     */
+    suspend fun receipt(authToken: String, sendId: String, state: String): Boolean {
+        val body = json.encodeToString(ReceiptRequest(sendId, state))
+        execute(post("/v1/receipts", body, authToken)).use { response ->
+            response.body.string()
+            return response.isSuccessful
+        }
+    }
+
     private fun errorMessage(text: String, code: Int): String = try {
         json.decodeFromString<ApiError>(text).message.ifBlank { "HTTP $code" }
     } catch (e: Exception) {

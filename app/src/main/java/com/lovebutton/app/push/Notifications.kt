@@ -76,22 +76,34 @@ fun ensureChannels(context: Context) {
     }
 }
 
+/** Extra carrying the send id from a notification tap into MainActivity. */
+const val EXTRA_SEND_ID = "send_id"
+
 /**
  * Posts one notification for a received message.
  *
  * Each gets a unique id so rapid sends stack rather than replacing one another —
  * four taps should feel like four messages, not one that keeps changing.
  */
-fun postMessageNotification(context: Context, msgId: Int, fromName: String) {
+fun postMessageNotification(
+    context: Context,
+    msgId: Int,
+    fromName: String,
+    sendId: String? = null,
+) {
     val message = messageForId(msgId)
     val text = message?.text ?: "New message"
     val channelId = message?.channelId ?: DEV_CHANNEL_ID
 
     val openApp = PendingIntent.getActivity(
         context,
-        0,
+        // A per-send request code: with a constant one, FLAG_UPDATE_CURRENT would
+        // rewrite every earlier notification's intent to carry the newest send id,
+        // so tapping an older notification would report "seen" for the wrong send.
+        sendId?.hashCode() ?: 0,
         Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra(EXTRA_SEND_ID, sendId),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
