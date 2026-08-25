@@ -73,8 +73,17 @@ class Prefs(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[Keys.READ_RECEIPTS] = enabled }
     }
 
-    /** Used on sign-out, and when the server rejects our token as unknown. */
+    /**
+     * Used on sign-out, and when the server rejects our token as unknown.
+     *
+     * Preserves the read-receipt preference deliberately: a token rejection is
+     * involuntary and invisible, so a privacy choice must not be collateral damage.
+     */
     suspend fun clearEnrolment() {
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit { prefs ->
+            val keep = prefs[Keys.READ_RECEIPTS]
+            prefs.clear()
+            if (keep != null) prefs[Keys.READ_RECEIPTS] = keep
+        }
     }
 }

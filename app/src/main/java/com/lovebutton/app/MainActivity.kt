@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.lifecycleScope
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.push.EXTRA_SEND_ID
 import com.lovebutton.app.ui.EnrolScreen
@@ -27,7 +26,6 @@ import com.lovebutton.app.ui.HomeScreen
 import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
 import com.lovebutton.app.work.ReceiptWorker
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -55,14 +53,13 @@ class MainActivity : ComponentActivity() {
 
     private fun reportSeenFrom(intent: Intent?) {
         val sendId = intent?.getStringExtra(EXTRA_SEND_ID) ?: return
+        // Cleared synchronously so a configuration change cannot report the same
+        // tap twice. The read-receipt toggle is checked inside ReceiptWorker
+        // rather than here: WorkManager owns the work from the moment it is
+        // enqueued, so a rotation between the tap and the preference read cannot
+        // lose a report that was genuinely earned.
         intent.removeExtra(EXTRA_SEND_ID)
-        lifecycleScope.launch {
-            // Checked on the phone that would report, not on the one that would
-            // display: it is her choice whether her reading is announced.
-            if (Prefs(this@MainActivity).readReceipts.first()) {
-                ReceiptWorker.enqueue(this@MainActivity, sendId, "seen")
-            }
-        }
+        ReceiptWorker.enqueue(this, sendId, "seen")
     }
 }
 
