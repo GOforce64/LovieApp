@@ -102,7 +102,7 @@ fun postMessageNotification(
         // so tapping an older notification would report "seen" for the wrong send.
         sendId?.hashCode() ?: 0,
         Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .putExtra(EXTRA_SEND_ID, sendId),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )

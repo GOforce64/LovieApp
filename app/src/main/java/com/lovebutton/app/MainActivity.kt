@@ -41,8 +41,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // The activity is single-instance in practice: a second tap arrives here
-        // rather than through onCreate, and without this it would never report.
+        // The notification intent sets FLAG_ACTIVITY_SINGLE_TOP (with CLEAR_TOP),
+        // which routes a notification tap to this callback when this activity is
+        // already on top, instead of destroying and recreating it. This ensures
+        // the seen report is delivered and avoids unnecessarily rebuilding the UI.
         setIntent(intent)
         reportSeenFrom(intent)
     }
