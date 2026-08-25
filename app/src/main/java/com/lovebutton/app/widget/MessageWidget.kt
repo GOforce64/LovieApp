@@ -53,6 +53,8 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
             WidgetState.IDLE, WidgetState.FAILED -> outlineIconFor(msgId)
             WidgetState.SENDING -> halfIconFor(msgId)
             WidgetState.SENT -> filledIconFor(msgId)
+            WidgetState.DELIVERED -> deliveredIconFor(msgId)
+            WidgetState.SEEN -> seenIconFor(msgId)
         }
 
         Box(
@@ -115,4 +117,20 @@ private fun filledIconFor(msgId: Int): Int = when (msgId) {
     3 -> R.drawable.ic_paw_filled
     4 -> R.drawable.ic_call_filled
     else -> R.drawable.ic_heart_filled
+}
+
+private fun deliveredIconFor(msgId: Int): Int = when (msgId) {
+    1 -> R.drawable.ic_heart_delivered
+    2 -> R.drawable.ic_bubble_delivered
+    3 -> R.drawable.ic_paw_delivered
+    4 -> R.drawable.ic_call_delivered
+    else -> R.drawable.ic_heart_delivered
+}
+
+private fun seenIconFor(msgId: Int): Int = when (msgId) {
+    1 -> R.drawable.ic_heart_seen
+    2 -> R.drawable.ic_bubble_seen
+    3 -> R.drawable.ic_paw_seen
+    4 -> R.drawable.ic_call_seen
+    else -> R.drawable.ic_heart_seen
 }

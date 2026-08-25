@@ -17,7 +17,7 @@ class WidgetStateTest {
         // a blank tile with no way to recover.
         assertEquals(WidgetState.IDLE, fromName(null))
         assertEquals(WidgetState.IDLE, fromName(""))
-        assertEquals(WidgetState.IDLE, fromName("DELIVERED"))
+        assertEquals(WidgetState.IDLE, fromName("ARCHIVED"))
         assertEquals(WidgetState.IDLE, fromName("nonsense"))
     }
 
@@ -32,10 +32,13 @@ class WidgetStateTest {
     fun `only the terminal states are held then cleared`() {
         // IDLE is the resting state so it is never "held". SENDING lasts as long as
         // the request does, which is not a fixed duration and must not be timed out
-        // by the UI — the worker is the only thing that knows when it ended.
+        // by the UI — the worker is the only thing that knows when it ended. SENT
+        // waits out the pending window because a receipt may still be coming.
         assertNull(WidgetState.IDLE.holdMillis)
         assertNull(WidgetState.SENDING.holdMillis)
-        assertEquals(4_000L, WidgetState.SENT.holdMillis)
+        assertEquals(20_000L, WidgetState.SENT.holdMillis)
         assertEquals(3_000L, WidgetState.FAILED.holdMillis)
+        assertEquals(4_000L, WidgetState.DELIVERED.holdMillis)
+        assertEquals(4_000L, WidgetState.SEEN.holdMillis)
     }
 }

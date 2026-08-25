@@ -2,8 +2,16 @@ package com.lovebutton.app.push
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.lovebutton.app.data.PendingSends
+import com.lovebutton.app.widget.WidgetState
+import com.lovebutton.app.widget.holdMillis
+import com.lovebutton.app.widget.setWidgetState
 import com.lovebutton.app.work.ReceiptWorker
 import com.lovebutton.app.work.RegisterTokenWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Receives data-only pushes.
@@ -36,7 +44,31 @@ class PushService : FirebaseMessagingService() {
                     ReceiptWorker.enqueue(applicationContext, sendId, "delivered")
                 }
             }
-            // "receipt" arrives in a later plan and must never post a notification.
+            "receipt" -> {
+                // Never a notification. A phone that buzzes when she reads a
+                // message is a phone nobody wants (spec §6.4).
+                val sendId = data["send_id"] ?: return
+                val state = when (data["state"]) {
+                    "delivered" -> WidgetState.DELIVERED
+                    "seen" -> WidgetState.SEEN
+                    else -> return
+                }
+                CoroutineScope(Dispatchers.Default).launch {
+                    val pending = PendingSends(applicationContext)
+                    // Null means the window expired or this app never sent it.
+                    // Dropping it silently is the spec's answer: a tile lighting
+                    // up for something sent an hour ago is confusing.
+                    val appWidgetId = pending.widgetFor(sendId) ?: return@launch
+
+                    setWidgetState(applicationContext, appWidgetId, state)
+                    // `delivered` deliberately does not forget the entry: `seen`
+                    // may still arrive within the window and needs the mapping.
+                    if (state == WidgetState.SEEN) pending.forget(sendId)
+
+                    delay(state.holdMillis ?: 0L)
+                    setWidgetState(applicationContext, appWidgetId, WidgetState.IDLE)
+                }
+            }
             else -> Unit
         }
     }

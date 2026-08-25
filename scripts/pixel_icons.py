@@ -23,7 +23,9 @@ import os, sys
 BORDER = "#D1447E"
 FILL   = "#FF6FA5"
 SHINE  = "#FFD9E8"
-IDLE   = "#C98BA8"   # the outline-only variant used for the Idle widget state
+IDLE   = "#C98BA8"
+DEEP   = "#C2185B"   # delivered: the fill deepens, it landed on her phone
+GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked   # the outline-only variant used for the Idle widget state
 
 ICONS_11 = {
 "heart": """
@@ -234,6 +236,44 @@ FILL_MODE = {
     "call": "up",
 }
 
+def seen_layers(solid, sil, holes, shine, n):
+    """Seen: the border turns gold around a deepened fill.
+
+    A shape only one pixel thick has no border layer to gild — layers() paints it
+    as pure fill so the letters do not go dark — so for those the glyph itself
+    turns gold. Without this, CALL's seen state would be indistinguishable from
+    its delivered one.
+    """
+    b, i, sh = layers(solid, sil, holes, shine, n)
+    if not any(any(r) for r in b):
+        return [(i, GOLD), (sh, SHINE)]
+    return [(i, DEEP), (b, GOLD), (sh, SHINE)]
+
+def tile_frame(n):
+    """A gold frame around the tile edge — a halo around the whole widget rather
+    than around the artwork, so shapes with gaps are not swallowed."""
+    return [[y == 0 or x == 0 or y == n-1 or x == n-1 for x in range(n)]
+            for y in range(n)]
+
+def glow_ring(sil, n):
+    """One cell outward from the silhouette — a ring that sits OUTSIDE the shape.
+
+    A real glow needs blur, which RemoteViews cannot do. A hard pixel ring is the
+    honest equivalent in this art style, and it reads at tile size where a soft
+    gradient would just look like a smudge.
+    """
+    ring = [[False]*n for _ in range(n)]
+    for y in range(n):
+        for x in range(n):
+            if sil[y][x]:
+                continue
+            for dy, dx in ((-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)):
+                ny, nx = y+dy, x+dx
+                if 0 <= ny < n and 0 <= nx < n and sil[ny][nx]:
+                    ring[y][x] = True
+                    break
+    return ring
+
 def half(solid, sil, holes, n, mode="up"):
     """A mid-fill frame: outlined all round, interior partly filled.
 
@@ -286,7 +326,7 @@ def build(icons, outdir, title):
 
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
            f'viewBox="0 0 {w} {h}"><rect width="{w}" height="{h}" fill="#141216"/>']
-    for row, variant in enumerate(["outline (idle)", "half (sending)", "filled (sent)"]):
+    for row, variant in enumerate(["filled (sent)", "delivered", "seen"]):
         oy = labelh + row*(span+pad+labelh)
         svg.append(f'<text x="{pad}" y="{oy-8}" fill="#8a8090" font-family="monospace" '
                    f'font-size="13">{title} · {variant}</text>')
@@ -301,6 +341,13 @@ def build(icons, outdir, title):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant.startswith("half"):
                 for cells, colour in half(solid, sil, holes, n, FILL_MODE.get(key, "up")):
+                    svg.append(svg_tile(cells, n, ox, oy, colour, span))
+            elif variant == "delivered":
+                b, i, sh = layers(solid, sil, holes, shine, n)
+                for cells, colour in ((i, DEEP), (b, BORDER), (sh, SHINE)):
+                    svg.append(svg_tile(cells, n, ox, oy, colour, span))
+            elif variant.startswith("seen"):
+                for cells, colour in seen_layers(solid, sil, holes, shine, n):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             else:
                 svg.append(svg_tile(union(outline(sil, n), holes, n), n, ox, oy, IDLE, span))
@@ -320,6 +367,11 @@ def build(icons, outdir, title):
             vector_drawable([(union(outline(sil, n), holes, n), IDLE)], n))
         open(os.path.join(outdir, f"ic_{key}_half.xml"), "w").write(
             vector_drawable(half(solid, sil, holes, n, FILL_MODE.get(key, "up")), n))
+        b, i, sh = layers(solid, sil, holes, shine, n)
+        open(os.path.join(outdir, f"ic_{key}_delivered.xml"), "w").write(
+            vector_drawable([(i, DEEP), (b, BORDER), (sh, SHINE)], n))
+        open(os.path.join(outdir, f"ic_{key}_seen.xml"), "w").write(
+            vector_drawable(seen_layers(solid, sil, holes, shine, n), n))
     print(f"{title}: {len(icons)*2} drawables + preview.svg -> {outdir}")
 
 if __name__ == "__main__":

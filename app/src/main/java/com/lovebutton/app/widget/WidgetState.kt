@@ -1,14 +1,14 @@
 package com.lovebutton.app.widget
 
+import com.lovebutton.app.data.PENDING_WINDOW_MS
+
 /**
  * What a widget is currently showing.
  *
- * Spec 7.1 defines six states; DELIVERED and SEEN need receipts from the server,
- * which do not exist yet, so they arrive with Plan 4. The four here are the ones
- * this app can prove. A widget that claims "delivered" without a receipt is
- * lying, and knowing she got it is the entire product.
+ * Spec 7.1 defines six states. DELIVERED and SEEN arrive from the server's
+ * receipts, which is why they can only be produced once a receipt lands.
  */
-enum class WidgetState { IDLE, SENDING, SENT, FAILED }
+enum class WidgetState { IDLE, SENDING, SENT, FAILED, DELIVERED, SEEN }
 
 /**
  * How long a state is displayed before falling back to IDLE, or null if it is
@@ -20,8 +20,11 @@ enum class WidgetState { IDLE, SENDING, SENT, FAILED }
 val WidgetState.holdMillis: Long?
     get() = when (this) {
         WidgetState.IDLE, WidgetState.SENDING -> null
-        WidgetState.SENT -> 4_000L
+        // Held for the whole pending window: a receipt may still arrive, and
+        // dropping to idle sooner would hide a delivered that was on its way.
+        WidgetState.SENT -> PENDING_WINDOW_MS
         WidgetState.FAILED -> 3_000L
+        WidgetState.DELIVERED, WidgetState.SEEN -> 4_000L
     }
 
 /**
