@@ -4,6 +4,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.lovebutton.app.data.PendingSends
 import com.lovebutton.app.widget.WidgetState
+import com.lovebutton.app.widget.clearWidgetStateIf
 import com.lovebutton.app.widget.holdMillis
 import com.lovebutton.app.widget.setWidgetState
 import com.lovebutton.app.work.ReceiptWorker
@@ -66,7 +67,7 @@ class PushService : FirebaseMessagingService() {
                     if (state == WidgetState.SEEN) pending.forget(sendId)
 
                     delay(state.holdMillis ?: 0L)
-                    setWidgetState(applicationContext, appWidgetId, WidgetState.IDLE)
+                    clearWidgetStateIf(applicationContext, appWidgetId, state)
                 }
             }
             else -> Unit

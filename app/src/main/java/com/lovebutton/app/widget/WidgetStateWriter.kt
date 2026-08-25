@@ -35,3 +35,46 @@ suspend fun setWidgetState(context: Context, appWidgetId: Int, state: WidgetStat
         }
     }
 }
+
+/**
+ * Returns one widget to IDLE, but only if it is still showing `expected`.
+ *
+ * Two receipts for the same send each carry their own hold timer (see
+ * `PushService`): `delivered` arrives, holds the tile for 4s, then resets it;
+ * `seen` can arrive inside that window, holds the tile for its own 4s, then
+ * resets it too. An unconditional reset from either timer would race the
+ * other — concretely, a `delivered` at t=0 and a `seen` at t=1000 would have
+ * the delivered coroutine's reset fire at t=4000 and unconditionally wipe the
+ * gold "seen" tile a full second early, since it has no idea a newer receipt
+ * already overwrote what it wrote. Comparing against `expected` first means
+ * only the coroutine whose own write is still on screen gets to clear it; a
+ * later write already stomped the current one's `expected` value and this
+ * becomes a no-op.
+ *
+ * The compare and the write happen inside one `updateAppWidgetState` block
+ * rather than as a separate read then write, so a concurrent writer cannot
+ * land in between and get silently overwritten by this call.
+ */
+suspend fun clearWidgetStateIf(context: Context, appWidgetId: Int, expected: WidgetState) {
+    if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+
+    val manager = GlanceAppWidgetManager(context)
+    val glanceId = runCatching { manager.getGlanceIdBy(appWidgetId) }.getOrNull() ?: return
+
+    var cleared = false
+    updateAppWidgetState(context, glanceId) { prefs ->
+        if (prefs[KEY_STATE] == expected.name) {
+            prefs[KEY_STATE] = WidgetState.IDLE.name
+            cleared = true
+        }
+    }
+    if (!cleared) return
+
+    // Same fan-out as setWidgetState, and skipped entirely when this call was
+    // a no-op — redrawing a tile that did not change is wasted IPC.
+    listOf(LoveWidget(), ThinkingWidget(), MissWidget(), CallWidget()).forEach { widget ->
+        if (glanceId in manager.getGlanceIds(widget.javaClass)) {
+            widget.update(context, glanceId)
+        }
+    }
+}
