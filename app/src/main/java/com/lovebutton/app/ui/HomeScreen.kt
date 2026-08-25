@@ -3,11 +3,13 @@ package com.lovebutton.app.ui
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,7 +21,12 @@ import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.work.SendWorker
 
 @Composable
-fun HomeScreen(partnerName: String, onOpenSetup: () -> Unit) {
+fun HomeScreen(
+    partnerName: String,
+    readReceipts: Boolean,
+    onReadReceiptsChange: (Boolean) -> Unit,
+    onOpenSetup: () -> Unit,
+) {
     val context = LocalContext.current
     val view = LocalView.current
 
@@ -48,6 +55,15 @@ fun HomeScreen(partnerName: String, onOpenSetup: () -> Unit) {
             ) {
                 Text(message.text)
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Send read receipts", style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = readReceipts, onCheckedChange = onReadReceiptsChange)
         }
 
         Button(

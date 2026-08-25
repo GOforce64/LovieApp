@@ -14,10 +14,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.push.EXTRA_SEND_ID
 import com.lovebutton.app.ui.EnrolScreen
@@ -25,6 +27,8 @@ import com.lovebutton.app.ui.HomeScreen
 import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
 import com.lovebutton.app.work.ReceiptWorker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,9 +55,14 @@ class MainActivity : ComponentActivity() {
 
     private fun reportSeenFrom(intent: Intent?) {
         val sendId = intent?.getStringExtra(EXTRA_SEND_ID) ?: return
-        ReceiptWorker.enqueue(this, sendId, "seen")
-        // Clear it so a configuration change does not report the same tap twice.
         intent.removeExtra(EXTRA_SEND_ID)
+        lifecycleScope.launch {
+            // Checked on the phone that would report, not on the one that would
+            // display: it is her choice whether her reading is announced.
+            if (Prefs(this@MainActivity).readReceipts.first()) {
+                ReceiptWorker.enqueue(this@MainActivity, sendId, "seen")
+            }
+        }
     }
 }
 
@@ -83,9 +92,17 @@ private fun Root() {
         }
         enrolment == null -> EnrolScreen(onEnrolled = { /* state flow re-emits */ })
         showSetup -> SetupScreen(onDone = { showSetup = false })
-        else -> HomeScreen(
-            partnerName = enrolment!!.partnerName,
-            onOpenSetup = { showSetup = true },
-        )
+        else -> {
+            val readReceipts by prefs.readReceipts.collectAsState(initial = true)
+            val scope = rememberCoroutineScope()
+            HomeScreen(
+                partnerName = enrolment!!.partnerName,
+                readReceipts = readReceipts,
+                onReadReceiptsChange = { enabled ->
+                    scope.launch { prefs.setReadReceipts(enabled) }
+                },
+                onOpenSetup = { showSetup = true },
+            )
+        }
     }
 }

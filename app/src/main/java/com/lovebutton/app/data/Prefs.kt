@@ -1,6 +1,7 @@
 package com.lovebutton.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -32,6 +33,7 @@ class Prefs(private val context: Context) {
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
         val PERSON = intPreferencesKey("person")
         val PARTNER_NAME = stringPreferencesKey("partner_name")
+        val READ_RECEIPTS = booleanPreferencesKey("read_receipts")
     }
 
     /** Null until this phone has enrolled. */
@@ -55,6 +57,20 @@ class Prefs(private val context: Context) {
             prefs[Keys.PERSON] = person
             prefs[Keys.PARTNER_NAME] = partnerName
         }
+    }
+
+    /**
+     * Whether this phone tells the other one that its messages were opened.
+     *
+     * Defaults to true: the feature only works if it is on, and someone who wants
+     * it off will find the switch. Delivery confirmation is mechanical and always
+     * sent; read confirmation is a choice (spec §6.4).
+     */
+    val readReceipts: Flow<Boolean> =
+        context.dataStore.data.map { prefs -> prefs[Keys.READ_RECEIPTS] ?: true }
+
+    suspend fun setReadReceipts(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[Keys.READ_RECEIPTS] = enabled }
     }
 
     /** Used on sign-out, and when the server rejects our token as unknown. */
