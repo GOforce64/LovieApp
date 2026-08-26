@@ -15,6 +15,7 @@ import com.lovebutton.app.data.PENDING_WINDOW_MS
 import com.lovebutton.app.data.PendingSends
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.widget.WidgetState
+import com.lovebutton.app.widget.clearWidgetStateIf
 import com.lovebutton.app.widget.holdMillis
 import com.lovebutton.app.widget.setWidgetState
 import kotlinx.coroutines.delay
@@ -77,20 +78,21 @@ class SendWorker(
      * waiting for a receipt, and dropping to idle sooner would hide a delivered
      * that was about to arrive.
      *
-     * A receipt landing first clears the pending entry, so the check below finds
-     * nothing and leaves the tile alone — otherwise this would overwrite the
-     * crimson or gold the receipt just set with idle.
+     * The clear is guarded on the tile still SHOWING sent, not on the pending
+     * entry still being live. Those look interchangeable and are not: the entry
+     * is written before the request and `widgetFor` expires it at exactly
+     * PENDING_WINDOW_MS, so after waiting that same window the lookup could
+     * never return anything but null and the tile was never returned to idle.
+     * Asking the tile what it is displaying has no such expiry, and still
+     * protects the crimson or gold a receipt may have painted in the meantime.
      */
     private suspend fun settle(appWidgetId: Int, state: WidgetState, result: Result): Result {
         setWidgetState(applicationContext, appWidgetId, state)
 
         if (state == WidgetState.SENT) {
             delay(PENDING_WINDOW_MS)
-            val pending = PendingSends(applicationContext)
-            if (pending.widgetFor(mintedSendId) != null) {
-                pending.forget(mintedSendId)
-                setWidgetState(applicationContext, appWidgetId, WidgetState.IDLE)
-            }
+            PendingSends(applicationContext).forget(mintedSendId)
+            clearWidgetStateIf(applicationContext, appWidgetId, WidgetState.SENT)
             return result
         }
 

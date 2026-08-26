@@ -36,14 +36,39 @@ class PendingSends(private val context: Context) {
         }
     }
 
-    /** The widget awaiting this send, or null if unknown or expired. */
-    suspend fun widgetFor(sendId: String): Int? {
+    /**
+     * The widget awaiting this send, or null if unknown or expired.
+     *
+     * The expiry is why this must never be used to decide whether to return a
+     * tile to idle after waiting out the window: by then every entry is expired
+     * by construction and the answer is always null. `SendWorker.settle` asks
+     * the tile what it is displaying instead.
+     *
+     * @param now injectable only so the expiry boundary can be tested; callers
+     *   in production always want the real clock.
+     */
+    suspend fun widgetFor(sendId: String, now: Long = System.currentTimeMillis()): Int? {
         val raw = context.pendingStore.data.first()[stringPreferencesKey(sendId)] ?: return null
         val parts = raw.split(":")
         val widget = parts.getOrNull(0)?.toIntOrNull() ?: return null
         val at = parts.getOrNull(1)?.toLongOrNull() ?: return null
-        if (System.currentTimeMillis() - at > PENDING_WINDOW_MS) return null
+        if (now - at > PENDING_WINDOW_MS) return null
         return widget
+    }
+
+    /**
+     * How much of the pending window this send has left, or 0 if it has none.
+     *
+     * The tile showing `delivered` is waiting for a `seen`, so it should stay lit
+     * for exactly as long as a `seen` could still be matched — which is measured
+     * from the SEND, not from when `delivered` happened to arrive. Holding a flat
+     * window from arrival instead would leave the tile lit well past the point
+     * where anything could still update it.
+     */
+    suspend fun remainingMs(sendId: String, now: Long = System.currentTimeMillis()): Long {
+        val raw = context.pendingStore.data.first()[stringPreferencesKey(sendId)] ?: return 0L
+        val at = raw.substringAfter(":").toLongOrNull() ?: return 0L
+        return (PENDING_WINDOW_MS - (now - at)).coerceAtLeast(0L)
     }
 
     suspend fun forget(sendId: String) {
