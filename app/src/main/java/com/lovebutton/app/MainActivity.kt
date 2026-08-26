@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.ui.EnrolScreen
+import com.lovebutton.app.ui.GuideScreen
 import com.lovebutton.app.ui.HomeScreen
 import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
@@ -59,6 +60,7 @@ private fun Root() {
     val enrolment by prefs.enrolment.collectAsState(initial = null)
     var loaded by remember { mutableStateOf(false) }
     var showSetup by remember { mutableStateOf(false) }
+    var showGuide by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         prefs.current()
@@ -71,9 +73,11 @@ private fun Root() {
         }
         enrolment == null -> EnrolScreen(onEnrolled = { /* state flow re-emits */ })
         showSetup -> SetupScreen(onDone = { showSetup = false })
+        showGuide -> GuideScreen(partnerName = enrolment!!.partnerName, onDone = { showGuide = false })
         else -> HomeScreen(
             partnerName = enrolment!!.partnerName,
             onOpenSetup = { showSetup = true },
+            onOpenGuide = { showGuide = true },
         )
     }
 }
