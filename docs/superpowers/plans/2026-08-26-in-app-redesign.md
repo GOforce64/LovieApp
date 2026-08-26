@@ -61,6 +61,11 @@ The generator currently holds pre-swap colours. Re-running it today would silent
 
 - [ ] **Step 1: Record the current drawables so drift is detectable**
 
+The generator does **not** write into `app/src/main/res/drawable/`. It takes a
+positional base directory and writes `<base>/grid-11/` and `<base>/grid-13/`; the app
+ships the **11-grid** icons, which were copied across by hand at some point. So the
+check is "regenerate into a scratch dir, compare grid-11 against what is committed".
+
 ```bash
 cd /home/killua/Projects/LovieApp
 mkdir -p /tmp/icon-baseline
@@ -95,14 +100,46 @@ GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked
 Change nothing else. `seen_layers` already paints `DEEP` plus `GOLD`, which is now
 pink plus gold — correct without being touched.
 
+- [ ] **Step 2b: Teach the generator that the resting bubble has no face**
+
+`'o'` (hole) cells are cut out of the *filled* variant and were also drawn as marks on
+the *outline* variant. That second behaviour was deliberately removed from the shipped
+`ic_bubble_outline.xml` on hardware — the user asked for the resting bubble to be an
+empty speech bubble with no smiling face — and the generator was never told. The
+bubble is the only icon with hole cells, so this changes nothing else.
+
+At **both** sites (the SVG preview loop and the drawable-writing loop), replace
+`union(outline(sil, n), holes, n)` with `outline(sil, n)`:
+
+```python
+                svg.append(svg_tile(outline(sil, n), n, ox, oy, IDLE, span))
+```
+
+```python
+            vector_drawable([(outline(sil, n), IDLE)], n))
+```
+
+Then fix the now-false claim in the module docstring (around line 11), or it becomes
+exactly the stale-comment trap the colour constants just were:
+
+```python
+  'o'  hole — inside the silhouette, cut out of the filled variant. NOT drawn on
+       the outline variant: the resting tile is deliberately blank, so the bubble
+       shows no face until it starts filling.
+```
+
 - [ ] **Step 3: Re-run and prove the output is byte-identical**
 
 ```bash
-python3 scripts/pixel_icons.py
-diff -r /tmp/icon-baseline app/src/main/res/drawable/ --include='ic_*.xml' && echo "IDENTICAL"
+rm -rf /tmp/icon-check && mkdir -p /tmp/icon-check
+python3 scripts/pixel_icons.py /tmp/icon-check
+for f in /tmp/icon-baseline/ic_*.xml; do
+  diff -q "$f" "/tmp/icon-check/grid-11/$(basename "$f")" || echo "DIFFERS: $(basename "$f")"
+done
+echo "--- compared $(ls /tmp/icon-baseline/ic_*.xml | wc -l) files ---"
 ```
 
-Expected: `IDENTICAL`. **If any file differs, stop and report the diff.** A difference means the generator drifted from the drawables in some way beyond colour, and that difference is a finding that must be understood before continuing — do not "fix" it by overwriting the drawables.
+Expected: no `DIFFERS:` lines, and 20 files compared. **If any file differs, stop and report the diff.** A difference means the generator drifted from the drawables in some way beyond the two changes above, and that difference is a finding that must be understood before continuing — do not "fix" it by overwriting the drawables.
 
 - [ ] **Step 4: Add the Kotlin emitter**
 
@@ -142,18 +179,21 @@ def emit_kotlin(all_icons):
 Call it once, with the merged icon dict, at the end of `main()`:
 
 ```python
-    emit_kotlin({**ICONS_11, **ICONS_13})
+    emit_kotlin(ICONS_11)   # the app ships the 11-grid icons
 ```
 
 - [ ] **Step 5: Regenerate and confirm the drawables STILL match**
 
 ```bash
-python3 scripts/pixel_icons.py
-diff -r /tmp/icon-baseline app/src/main/res/drawable/ --include='ic_*.xml' && echo "STILL IDENTICAL"
+rm -rf /tmp/icon-check && mkdir -p /tmp/icon-check
+python3 scripts/pixel_icons.py /tmp/icon-check
+for f in /tmp/icon-baseline/ic_*.xml; do
+  diff -q "$f" "/tmp/icon-check/grid-11/$(basename "$f")" || echo "DIFFERS: $(basename "$f")"
+done
 head -12 app/src/main/java/com/lovebutton/app/widget/PixelGrids.kt
 ```
 
-Expected: `STILL IDENTICAL`, and the Kotlin file starts with the package line and the generated-file warning.
+Expected: no `DIFFERS:` lines, and the Kotlin file starts with the package line and the generated-file warning.
 
 - [ ] **Step 6: Write the test that ties the grids to the drawables**
 

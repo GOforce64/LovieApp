@@ -21,11 +21,15 @@ import os, sys
 # a pale widget background; the shine is a near-white pink catching the light
 # from the top right, the way a glossy object would.
 BORDER = "#D1447E"
-FILL   = "#FF6FA5"
+# NAMES ARE HISTORICAL. `FILL` is whatever the *filled (sent)* variant paints and
+# `DEEP` is whatever *delivered* paints — the two swapped when the ladder's colours
+# were swapped on hardware, and the values moved rather than the usages, because
+# each name is read from two places and a partial rewiring is silent.
+FILL   = "#D81B60"   # sent: the server has it, not yet her phone
 SHINE  = "#FFD9E8"
 IDLE   = "#C98BA8"
-DEEP   = "#C2185B"   # delivered: the fill deepens, it landed on her phone
-GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked   # the outline-only variant used for the Idle widget state
+DEEP   = "#FF6FA5"   # delivered: it landed on her phone
+GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked
 
 ICONS_11 = {
 "heart": """
