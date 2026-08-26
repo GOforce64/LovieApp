@@ -70,33 +70,30 @@ ls /tmp/icon-baseline | wc -l   # expect 20
 
 - [ ] **Step 2: Fix the two stale colour constants**
 
-In `scripts/pixel_icons.py`, replace lines 24-28's constants so they match what actually ships. The names describe roles, so the *names* move, not just the values:
+**Swap the two VALUES. Do not rewire any usage.** `FILL` and `DEEP` are each
+referenced in two separate places — once in the SVG preview loop and again in the
+drawable-writing loop — so rewiring usages means finding all four sites and would
+half-fix the generator if you missed one, producing drawables that disagree with the
+preview sheet. Swapping the values fixes every site at once and cannot be done
+partially.
+
+In `scripts/pixel_icons.py`, replace lines 24-28 with exactly this:
 
 ```python
 BORDER = "#D1447E"
-FILL   = "#FF6FA5"   # delivered: it landed on her phone
+# NAMES ARE HISTORICAL. `FILL` is whatever the *filled (sent)* variant paints and
+# `DEEP` is whatever *delivered* paints — the two swapped when the ladder's colours
+# were swapped on hardware, and the values moved rather than the usages, because
+# each name is read from two places and a partial rewiring is silent.
+FILL   = "#D81B60"   # sent: the server has it, not yet her phone
 SHINE  = "#FFD9E8"
 IDLE   = "#C98BA8"
-DEEP   = "#D81B60"   # sent: the server has it, not yet her phone
+DEEP   = "#FF6FA5"   # delivered: it landed on her phone
 GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked
 ```
 
-Then swap their use so `filled (sent)` paints `DEEP` and `delivered` paints `FILL`. In `main()`'s variant loop (around line 340):
-
-```python
-            if variant == "filled (sent)":
-                for cells, colour in ((i, DEEP), (b, BORDER), (sh, SHINE)):
-                    ...
-            elif variant == "delivered":
-                for cells, colour in ((i, FILL), (b, BORDER), (sh, SHINE)):
-                    ...
-```
-
-And in `seen_layers`, the deepened fill becomes `FILL` (pink), since seen is delivered-plus-gold:
-
-```python
-    return [(i, FILL), (b, GOLD), (sh, SHINE)]
-```
+Change nothing else. `seen_layers` already paints `DEEP` plus `GOLD`, which is now
+pink plus gold — correct without being touched.
 
 - [ ] **Step 3: Re-run and prove the output is byte-identical**
 
@@ -1718,7 +1715,7 @@ private fun pandaFor(msgId: Int): Int = when (msgId) {
  * read as a sticker at all.
  */
 @Composable
-private fun Sticker(
+private fun StickerBox(
     fill: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
     radius: Int = 16,
@@ -1731,14 +1728,14 @@ private fun Sticker(
                 .matchParentSize()
                 .offset(x = StickerShadow, y = StickerShadow)
                 .clip(shape)
-                .background(com.lovebutton.app.ui.Sticker.Ink)
+                .background(Sticker.Ink)
         )
         Box(
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
                 .background(fill)
-                .border(StickerKeyline, com.lovebutton.app.ui.Sticker.Ink, shape)
+                .border(StickerKeyline, Sticker.Ink, shape)
         ) { content() }
     }
 }
@@ -1757,11 +1754,11 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(com.lovebutton.app.ui.Sticker.Ground)
+            .background(Sticker.Ground)
             .padding(20.dp),
     ) {
         // ---- focal area ----
-        Sticker(fill = com.lovebutton.app.ui.Sticker.Surface, radius = 22, modifier = Modifier.fillMaxWidth()) {
+        StickerBox(fill = Sticker.Surface, radius = 22, modifier = Modifier.fillMaxWidth()) {
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 22.dp, horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1801,7 +1798,7 @@ fun HomeScreen(
 
         // ---- the four messages ----
         MESSAGES.forEach { message ->
-            Sticker(
+            StickerBox(
                 fill = stickerColorFor(message.id),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1834,8 +1831,8 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             listOf("What the colours mean" to onOpenGuide, "Delivery setup" to onOpenSetup)
                 .forEach { (label, action) ->
-                    Sticker(
-                        fill = com.lovebutton.app.ui.Sticker.Surface,
+                    StickerBox(
+                        fill = Sticker.Surface,
                         radius = 13,
                         modifier = Modifier.weight(1f).clickable { action() },
                     ) {
@@ -1853,6 +1850,9 @@ fun HomeScreen(
 ```
 
 - [ ] **Step 3: Route the guide from `MainActivity`**
+
+> **Execution order:** Task 10 runs BEFORE this task. `GuideScreen` must already
+> exist or this step cannot compile, and a task has to end independently testable.
 
 In `MainActivity.kt`'s `Root()`, add a second screen flag beside `showSetup`:
 
@@ -2064,20 +2064,23 @@ git commit -m "feat(ui): the states guide, showing the widget's own drawables"
 
 - [ ] **Step 1: Add the splash theme**
 
-Create `app/src/main/res/values/themes.xml`:
+`app/src/main/res/values/themes.xml` **already exists** and already defines
+`Theme.LoveButton`, which the manifest references twice. Keep that name — renaming it
+means editing the manifest in two places for nothing. **Modify** the file to:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.LoveButton" parent="android:Theme.Material.Light.NoActionBar" />
+
     <!-- The platform splash API rather than a splash Activity: an Activity
          flashes the system splash first, so you get two. -->
-    <style name="Theme.Lovie.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.LoveButton.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#FFF0F5</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_heart_filled</item>
         <item name="windowSplashScreenAnimationDuration">700</item>
-        <item name="postSplashScreenTheme">@style/Theme.Lovie</item>
+        <item name="postSplashScreenTheme">@style/Theme.LoveButton</item>
     </style>
-    <style name="Theme.Lovie" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
 ```
 
@@ -2087,7 +2090,7 @@ Add the dependency to `app/build.gradle.kts`:
     implementation("androidx.core:core-splashscreen:1.0.1")
 ```
 
-In `AndroidManifest.xml`, set the application (or MainActivity) theme to `@style/Theme.Lovie.Splash`.
+In `AndroidManifest.xml`, change the `<application>` theme at line 22 to `@style/Theme.LoveButton.Splash`. Leave the activity theme at line 28 as `@style/Theme.LoveButton`.
 
 In `MainActivity.onCreate`, **before** `super.onCreate(...)`:
 
