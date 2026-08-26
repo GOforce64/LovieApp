@@ -66,6 +66,12 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // Robolectric needs the merged resources and manifest on the unit-test
+    // classpath; without this it starts and then fails resolving resources.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 /**
@@ -108,6 +114,9 @@ dependencies {
     implementation(libs.androidx.glance.appwidget)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.serialization.json)
 }
