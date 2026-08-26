@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.LoveButton" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- The platform splash API rather than a splash Activity: an Activity
+         flashes the system splash first, so you get two. -->
+    <style name="Theme.LoveButton.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#FFF0F5</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_heart_filled</item>
+        <item name="windowSplashScreenAnimationDuration">700</item>
+        <item name="postSplashScreenTheme">@style/Theme.LoveButton</item>
+    </style>
 </resources>

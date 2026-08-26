@@ -359,11 +359,17 @@ widget state and nothing else.
 
 ### 6.1 Screens
 
-Three, and two of them you see once.
+Four, and two of them you see once.
 
 1. **Enrol** — a single text box for your code. Once per phone, ever.
 2. **Setup checklist** — the MIUI screen (§8). Re-verifies silently on every launch.
-3. **Home** — her name, the four messages as tap-to-send rows, a link to widget help.
+3. **Home** — her name, the four messages as tap-to-send rows with the mascot
+   beside each, and a focal area showing the most recent send's state (§7.1).
+   Unlike the widget, it keeps the final state rather than returning to idle:
+   remembering is this screen's job, and a permanently lit home-screen button
+   would only be noise.
+4. **States guide** — the six ladder states, each shown with the widget's own
+   drawable and a line explaining it.
 
 No friend list, no recipient picker, no send counter anywhere.
 
@@ -483,6 +489,11 @@ which is what `RemoteViews` handles well.
 | Delivered | filled | pink | until seen, or the window closes |
 | Seen | filled + soft outer glow | pink + gold | 4s, then idle |
 | Failed | outline + small ✗ | grey | 3s, then idle |
+
+The app's focal area shows the same six states from the same artwork, but
+animated per pixel rather than swapped between finished pictures, and it keeps
+the final state where the widget returns to idle. See the in-app redesign design
+document, §4.3 and §4.5.
 
 Android 12+ animates widget content changes on its own, which is enough to make the
 bloom feel deliberate without any frame-by-frame work.

@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.ui.EnrolScreen
 import com.lovebutton.app.ui.GuideScreen
@@ -27,6 +28,9 @@ import com.lovebutton.app.ui.LoveButtonTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super.onCreate: the splash is installed by swapping the
+        // window theme, and after that call the window is already showing.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             LoveButtonTheme {

@@ -19,7 +19,7 @@
         android:icon="@android:drawable/ic_dialog_email"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LoveButton">
+        android:theme="@style/Theme.LoveButton.Splash">
 
         <activity
             android:name=".MainActivity"

@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -89,6 +92,11 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Sticker.Ground)
+            // targetSdk 36 draws edge to edge whether or not it is asked to, so
+            // without this the focal card sits under the status bar and the two
+            // buttons sit under the gesture pill. The ground colour is painted
+            // before the inset so it still fills the whole screen.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(20.dp),
     ) {
         // ---- focal area ----
