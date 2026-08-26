@@ -363,8 +363,7 @@ Three, and two of them you see once.
 
 1. **Enrol** — a single text box for your code. Once per phone, ever.
 2. **Setup checklist** — the MIUI screen (§8). Re-verifies silently on every launch.
-3. **Home** — her name, the four messages as tap-to-send rows, a "send read receipts"
-   toggle, a link to widget help.
+3. **Home** — her name, the four messages as tap-to-send rows, a link to widget help.
 
 No friend list, no recipient picker, no send counter anywhere.
 
@@ -408,16 +407,36 @@ declining it gracefully.
 One `FirebaseMessagingService`, branching on `data.type`:
 
 - **`msg`** — map `msg_id` to text and channel, post the notification, then fire
-  `POST /v1/receipts {send_id, state: "delivered"}` via WorkManager. Attach the
-  `send_id` to the notification's `PendingIntent` so tapping it fires
-  `state: "seen"` before opening the app.
+  `POST /v1/receipts {send_id, state: "delivered"}` via WorkManager. Then decide
+  `seen` (below).
 - **`receipt`** — post nothing. Look up the pending send by `send_id` in DataStore,
   update that widget's state, and clear the entry once `seen` arrives or the window
   expires.
 
-If the "send read receipts" toggle is off, skip the `seen` call but still send
-`delivered`. Delivery confirmation is mechanical; read confirmation is a choice, and
-she should get to make it.
+**Seen means she looked at the screen, not that she tapped anything.** A message
+read on the lock screen and swiped away was still read, and making her open the app
+to prove it reports the wrong thing. So, at the moment the notification posts:
+
+- If the screen is on **and** the phone is unlocked, she is already looking at it —
+  fire `state: "seen"` immediately. Both halves are required: a screen that lit up
+  behind the keyguard is the phone reacting, not a person reading.
+- Otherwise store the `send_id` and fire `seen` for everything stored on the next
+  unlock, via a receiver for `ACTION_USER_PRESENT` (and `ACTION_SCREEN_ON`, the only
+  signal on a phone with no keyguard).
+
+That receiver **must be registered in code, not in the manifest**.
+`ACTION_USER_PRESENT` is not on Android's implicit-broadcast exemption list, so a
+manifest-declared receiver for it is never invoked on targetSdk 26+ — it looks
+correct and does nothing. Registering it from `Application.onCreate` means the push
+that delivers the message is what starts the listener. If the process is reclaimed
+before she unlocks, no `seen` is reported: the failure is silence, never a wrong
+answer.
+
+There is no read-receipt toggle. Receipts are always sent.
+
+The `seen` POST fires regardless of how old the send is — the receipt is a record,
+and recording is uncapped. Only the sender's *tile* is time-limited, by the 20-second
+window in §7.1.
 
 ### 6.5 Network calls
 
@@ -459,10 +478,10 @@ which is what `RemoteViews` handles well.
 | State | Icon | Colour | Held for |
 |---|---|---|---|
 | Idle | outline | pale grey-pink | — |
-| Sending | outline, dimmed | pale pink | until response |
-| Sent | filled | pink | until receipt or timeout |
-| Delivered | filled | deep red | 4s, then idle |
-| Seen | filled + soft outer glow | deep red | 4s, then idle |
+| Sending | outline, dimmed | crimson, part-filled | until response |
+| Sent | filled | crimson | until receipt or timeout |
+| Delivered | filled | pink | until seen, or the window closes |
+| Seen | filled + soft outer glow | pink + gold | 4s, then idle |
 | Failed | outline + small ✗ | grey | 3s, then idle |
 
 Android 12+ animates widget content changes on its own, which is enough to make the
@@ -471,6 +490,12 @@ bloom feel deliberate without any frame-by-frame work.
 **Timeout:** if no `delivered` receipt arrives within **20 seconds**, settle on plain
 "Sent" and clear the pending entry. Receipts arriving after that are dropped silently
 — a heart lighting up for something sent an hour ago is confusing, not sweet.
+
+Whatever returns the tile to idle at the end of that window must decide by asking
+**what the tile is currently displaying**, not by asking whether the pending entry is
+still live. The entry is written before the request and expires at exactly the same
+20 seconds, so after waiting the window out that lookup can only ever answer "gone" —
+a guard built on it never fires and the tile stays lit forever.
 
 **Correlation:** store `pending_send_id → glanceId` in DataStore when a send is
 dispatched. On receipt, resolve the widget via `GlanceAppWidgetManager` and update
@@ -563,7 +588,7 @@ Do not proceed until the current milestone is verified on real hardware.
 | 3 | MIUI checklist screen + overnight smoke test | Trust it |
 | 4 | Four messages, four channels, four sounds | Hear the difference between them |
 | 5 | One widget: 2x2, WorkManager send, haptic, idle/sending/sent/failed | Send from the home screen |
-| 6 | Receipts: endpoint, reverse push, delivered/seen states, 20s timeout, toggle | See it land |
+| 6 | Receipts: endpoint, reverse push, delivered/seen states, 20s timeout, seen-on-unlock | See it land |
 | 7 | The other three widgets | — |
 | 8 | Hardening: abuse ceiling, retention cron, `UNREGISTERED` cleanup, README | Publish it |
 

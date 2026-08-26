@@ -13,7 +13,7 @@ Milestone 6. Her phone tells yours that the message landed, and that she looked.
 ## 1. Scope
 
 **In:** `POST /v1/receipts`; the reverse receipt push; the Delivered and Seen widget
-states; the 20-second timeout; the read-receipt toggle.
+states; the 20-second timeout.
 
 **Out:** the in-app redesign. The app's home screen is a temporary scaffold and is
 being redesigned in Plan 5, with real Compose animation for the same three states.
@@ -78,11 +78,12 @@ Per spec §5.3:
 the notification, a `POST /v1/receipts {send_id, state: "delivered"}` through
 WorkManager — never inline, per spec §6.5.
 
-The notification's `PendingIntent` carries the `send_id`, so tapping it fires
-`state: "seen"` before opening the app.
+`seen` is decided at the same moment, from whether anyone could be looking: screen on
+**and** unlocked fires it immediately, anything else stores the `send_id` for the next
+unlock (spec §6.4). The notification carries no `send_id` and tapping it reports
+nothing — a message read on the lock screen and swiped away was still read.
 
-If the read-receipt toggle is off, the `seen` call is skipped and `delivered` is still
-sent. Delivery confirmation is mechanical; read confirmation is a choice (spec §6.4).
+Receipts are unconditional. There is no toggle.
 
 ---
 
@@ -127,11 +128,18 @@ Drawables are already generated and staged at
 
 ---
 
-## 7. The toggle
+## 7. Unlock detection
 
-A "send read receipts" switch on the home screen, per spec §6.1, backed by DataStore.
-Plan 5's redesign will rehouse it; it lives there now because the setting has to exist
-somewhere for §4 to honour it.
+`UnlockReceiver` listens for `ACTION_USER_PRESENT` and `ACTION_SCREEN_ON`, drains the
+stored `send_id`s and reports each as `seen`. It is registered from
+`LoveButtonApp.onCreate`, never from the manifest: `ACTION_USER_PRESENT` is not on
+Android's implicit-broadcast exemption list, so a manifest receiver for it is never
+invoked on targetSdk 26+.
+
+Both actions are checked against the live device rather than trusted by name, because
+`ACTION_SCREEN_ON` also fires behind the keyguard.
+
+Process death before the unlock means no `seen` — silence, not a wrong answer.
 
 ---
 

@@ -161,3 +161,251 @@ Ruling 3: the finding is correct and I am fixing it by adding
   tap resumes the existing screen instead of recreating it, which is what the code
   was written to expect anyway.
 Task 4: fix round 1/5 dispatched (resumed original implementer) — FIX_BASE 629cd78.
+Task 6: fix round 1/5 implementer DONE (commit 1f3fbf6). Controller verified
+  independently: three files, 25 insertions, both rulings applied exactly.
+  clearEnrolment does the read-clear-rewrite inside one edit block with a
+  `if (keep != null)` guard, so a user who never touched the switch does not get
+  `false` written for them. reportSeenFrom is synchronous again and is now SHORTER
+  than the version it replaces — the fix removed code rather than adding a guard,
+  which is the shape a good fix has. lifecycleScope and flow.first dropped from
+  MainActivity; launch and rememberCoroutineScope kept for the switch's write.
+  `./gradlew :app:assembleDebug :app:testDebugUnitTest` re-run here: 21 tests, 0
+  failures, BUILD SUCCESSFUL.
+Task 6: fix round 1/5 scoped re-review dispatched (sonnet) — range c5da90e..1f3fbf6.
+  Five things named for it to check rather than a general pass, the first being the
+  highest-consequence way this fix could go wrong: the new gate must suppress "seen"
+  and NOTHING else, because a condition that also caught "delivered" would break the
+  ladder for every user regardless of their toggle. Also asked whether the move
+  changed WHO decides (the spec requires the toggle be read on the reporting phone),
+  whether placing the gate after the enrolment null-check changes behaviour for a
+  toggle-off user with no valid enrolment, and whether the import split is right in
+  both directions rather than just compiling.
+Task 6: fix round 1/5 re-review — both findings ADDRESSED, no new
+  Critical/Important breakage. The reviewer did all five named checks and grounded
+  the important one rather than eyeballing it: it grepped the ReceiptWorker.enqueue
+  call sites and confirmed there are exactly two, "seen" from MainActivity and
+  "delivered" from PushService:45, so the gate cannot catch delivered. It also
+  confirmed the move preserved WHO decides (WorkManager runs on the device that
+  enqueued, reading that device's own DataStore) and that a never-touched toggle
+  leaves the key absent rather than writing false.
+Task 6: minor (deferred, new, from the re-review): with the toggle off AND no valid
+  enrolment, a job is now enqueued that returns Result.failure() where previously
+  none was enqueued at all. No network call either way, no user-visible difference —
+  WorkManager bookkeeping only.
+Task 6: minor (deferred, new, from the re-review): doWork() constructs
+  Prefs(applicationContext) twice rather than reusing one instance. Same underlying
+  DataStore singleton, so harmless.
+Task 6: complete (commits ed2aed8..1f3fbf6, review clean after 1 fix round)
+
+## All code tasks complete — Tasks 1-6. Task 7 is the human hardware pass (Ruling 6).
+Controller ran the SERVER suite independently before the final review's verdict, since
+  every prior verification in this session was Android-only and the branch also
+  changed two server routes: `cd server && npm test` gives 67 passed across 10 files
+  (up from the 59/9 recorded at Task 1 — Task 2's receipts endpoint added the
+  difference). Both suites green on 1f3fbf6.
+Final whole-branch review dispatched (opus, most capable per Model Selection) —
+  range 8d51864..1f3fbf6, 10 commits. Given the eight spec invariants to verify
+  against the CODE rather than against the plan's claims, the full deferred-minor
+  list to triage explicitly, and Ruling 5 for an independent second opinion on
+  whether deferring it was right.
+Final whole-branch verification done by the controller directly (this session; the
+  dispatched final review's verdict was never recorded before the previous session
+  ended, so the gate was re-run here rather than assumed). Both suites re-run on
+  1f3fbf6: `cd server && npm test` gives 67 passed across 10 files;
+  `./gradlew :app:assembleDebug :app:testDebugUnitTest` gives 21 tests, 0 failures,
+  BUILD SUCCESSFUL. Read the branch diff (8d51864..1f3fbf6, 10 commits) against the
+  spec's §4 invariants rather than against the plan's claims:
+  - Invariant 1 (sender is the authenticated device): both routes read
+    `device.person` from the bearer context; no sender identity is read from a body.
+  - Invariant 2 (recipient derived server-side): send.ts still computes
+    `recipientOf(device.person)`. The new `send_id` field lets the client choose an
+    id, never a destination — and send.test.ts:85 "ignores any recipient the client
+    tries to name" pins that with the new field in play.
+  - Invariant 3 (only the recipient may acknowledge): receipts.ts compares
+    `row.to_person` against `device.person` and 403s `not_recipient` BEFORE any
+    write, so a refused call leaves the row untouched. Tested at receipts.test.ts:76.
+  All three rulings confirmed present in the code: PENDING_WINDOW_MS is imported by
+  WidgetState.kt and used for SENT (Ruling 1); ReceiptWorker returns
+  `Result.success()` unconditionally with the reasoning in a comment and no `takeIf`
+  (Ruling 2); the notification intent carries
+  FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_SINGLE_TOP and onNewIntent's comment
+  matches what the flags actually do (Ruling 3).
+Task 7: BLOCKED on the human partner, as designed. It is the hardware pass: no
+  Android devices are attached here (`adb devices` lists none), Steps 2-5 require a
+  person watching a tile and tapping a notification on two phones, and Step 1/Step 6
+  need a production `npm run deploy` — an outward-facing action not taken without
+  explicit authorisation. Handed to the partner with the branch green.
+
+## Task 7 (hardware pass) — in progress
+Step 1: DONE. Partner ran `cd server && npm run deploy` themselves — deployed
+  love-button, version 53c2bfab-b91f-4347-845e-f6506e1b11b8, bindings TOKEN_CACHE
+  (KV), DB (D1 love-button), FIREBASE_PROJECT_ID, PERSON_1/2_NAME all present.
+  Two devices now attached where the previous session had none: 923262ff
+  (24115RA8EG) and 192.168.10.28:39881 (21081111RG). `./gradlew :app:assembleDebug`
+  up-to-date on 1f3fbf6, installed with `-r` on both — Success on both.
+Step 6 groundwork: the debug build is run-as-able, so phone A's bearer token can be
+  read out of /data/data/com.lovebutton.app/files/datastore/love_button.preferences_pb
+  without a manual copy. The curl still needs a real send_id, which only exists
+  after Step 2, so Step 6 runs after the ladder — not before.
+Steps 2-5: BLOCKED on the human partner by design — each one requires a person
+  watching a tile and tapping a notification on two phones.
+
+## Plan 4 rework — partner-directed, after Step 1-4 hardware feedback
+Partner ran Steps 2-4 and rejected three design points and reported one bug. Handled
+  through brainstorming (bounded path, approved before any code was written).
+
+Ruling 7: the read-receipt toggle is REMOVED entirely. The partner said they never
+  specified it; checked before answering rather than agreeing reflexively, and it was
+  in fact theirs — love-button-spec.md:366 (§6.1 home screen) and :418 (§6.4). So the
+  plan built exactly what the binding spec asked for. It is still their spec and
+  their call, so the toggle goes and BOTH spec sections were amended in the same
+  change — leaving §6.1 asking for a switch would have had Plan 5 rebuild it.
+  Deleted: the Switch and its two HomeScreen parameters, Prefs.readReceipts /
+  setReadReceipts / the READ_RECEIPTS key, the "seen" gate in ReceiptWorker, and
+  clearEnrolment's read-clear-rewrite (now a plain prefs.clear() again). This
+  reverses Task 6 and the whole of its fix round 1/5.
+
+Ruling 8: "seen" now means she LOOKED at the screen, not that she tapped the
+  notification. Asked the partner rather than guessing, because their message read
+  two ways ("delivered status should be when phone B unlocks"). They chose
+  unlock-OR-already-awake over unlock-only: if the phone is awake and unlocked when
+  the notification posts she is already looking at it, so seen fires immediately;
+  otherwise the send id waits for the next unlock. Both halves of the awake test are
+  required — an interactive screen behind the keyguard is the phone reacting to the
+  push, not a person reading.
+  New: data/UnseenSends.kt (own DataStore file, drain() reads and clears in ONE edit
+  so two close unlock broadcasts cannot double-report), push/Presence.kt
+  (couldBeLookingNow, pure predicate + live-device overload), push/UnlockReceiver.kt.
+  Removed: EXTRA_SEND_ID, MainActivity.reportSeenFrom, postMessageNotification's
+  sendId parameter, and the per-send PendingIntent request code that existed only to
+  keep those extras distinct. onNewIntent and the SINGLE_TOP flag from Ruling 3 stay
+  — they are about resuming in place, not about receipts.
+Ruling 8a: UnlockReceiver is registered from LoveButtonApp.onCreate, NEVER the
+  manifest. Verified against Android's implicit-broadcast exemption list rather than
+  assumed: ACTION_USER_PRESENT is not on it, so on targetSdk 36 a manifest-declared
+  receiver is never invoked — it would have looked correct and silently done nothing,
+  which is the worst possible failure for this feature. Checked before designing, not
+  after building. ACTION_SCREEN_ON is also listened for (a phone with no keyguard
+  gives no USER_PRESENT), and both are re-checked against the live device rather than
+  trusted by action name. Cost if the process dies before the unlock: no seen is
+  reported. Silence, never a wrong answer.
+Ruling 8b: the seen POST fires regardless of the send's age, but PENDING_WINDOW_MS
+  stays 20s. Partner's explicit choice: recording is uncapped because the receipt is
+  a record; DISPLAY stays capped because spec §7.1's reasoning (a heart lighting up
+  for something sent an hour ago) is still right. UnseenSends therefore has no expiry
+  by design, and says so.
+
+Ruling 9 (the Step 3 bug — partner reported A's tile stayed filled "for minutes,
+  never times out"): root cause found by reading, then PINNED BY TEST rather than
+  asserted. SendWorker.settle waited exactly PENDING_WINDOW_MS and then guarded the
+  clear on `pending.widgetFor(mintedSendId) != null`. But the entry is written BEFORE
+  the request and widgetFor expires entries at exactly PENDING_WINDOW_MS, so by the
+  time the guard ran the answer was null by construction — every time, not
+  occasionally. The tile was never returned to idle. Fixed by asking the tile what it
+  is DISPLAYING instead: clearWidgetStateIf(ctx, id, SENT), the primitive that
+  already existed in WidgetStateWriter.kt for exactly this shape of race, plus an
+  unconditional forget(). The trap is now written into spec §7.1 so it cannot be
+  reintroduced.
+
+Ruling 10: crimson #C2185B -> #D81B60 across the delivered/seen drawables, partner
+  said the old one was too dark. NOTE for the partner: ic_call_seen.xml was already
+  drawn entirely in gold with no crimson body at all, unlike the other three *_seen
+  icons — a pre-existing art inconsistency, untouched here because changing icon art
+  is a design decision, not a recolour.
+
+Test infrastructure (declared scope creep, flagged to the partner before doing it):
+  Robolectric 4.16 added as testImplementation, with androidx.test:core and
+  coroutines-test. Task 3's review had deferred "PendingSends has no tests" precisely
+  because there was no way to test a DataStore class here. 4.16 is the first release
+  with SDK 36 support and needs a JDK 21+ runtime (JDK 26 here); both facts checked
+  against the docs first and recorded in libs.versions.toml, matching that file's
+  existing convention of writing down version traps. Probed with one throwaway test
+  and deleted it before building anything on top.
+Verification: `./gradlew :app:assembleDebug :app:testDebugUnitTest` — BUILD
+  SUCCESSFUL, 37 tests / 0 failures / 0 errors across 7 classes (was 21 across 4).
+  New: PendingSendsTest (7, including the expiry boundary that made the old guard
+  impossible), PresenceTest (4, all four corners of the awake/locked predicate),
+  UnseenSendsTest (5, including drain-empties and duplicate-remember).
+NOT covered by unit test, stated plainly rather than papered over: SendWorker.settle
+  itself, UnlockReceiver's broadcast wiring, and PushService's branch — all need a
+  worker/broadcast harness this project does not have. They are what Step 2/3/5 of
+  the hardware pass exist to check.
+Install: phone A (923262ff) updated. Phone B (192.168.10.28:39881) had dropped its
+  wireless-debugging port by then and needs reconnecting before its install.
+
+Ruling 10a (supersedes the colour half of Ruling 10): partner asked to SWAP the two
+  ladder colours rather than just lighten one — the filling animation becomes crimson
+  #D81B60 and the frame that was crimson becomes pink #FF6FA5. Applied across
+  half/filled/delivered/seen for all four icon families, and spec §7.1's table plus
+  Task 7's brief updated to match so the hardware pass checks the right colours.
+  Judgment call flagged to the partner: they named only "the originally crimson
+  frame" (delivered), but SEEN also had a crimson body. Swapped it too, so seen stays
+  "delivered plus a gold border" rather than becoming the only crimson frame left.
+  One sed to reverse if that reads wrong on glass.
+Step 2/5 retest was INVALID, not a failure: partner reported seen still needing a
+  notification tap, but `dumpsys package` shows phone B was updated at 12:47 and
+  phone A at 12:40 — B was running the pre-change build when they tested. Worth
+  noting the observation could not have distinguished the two designs anyway, since
+  tapping a notification requires unlocking first, and the unlock is the new trigger.
+  Both phones now on the same build; retest pending.
+Note for the retest: `adb install -r` kills the app process, and UnlockReceiver is
+  registered from LoveButtonApp.onCreate. Opening the app once on phone B after an
+  install is the cheapest way to guarantee the process is up and the receiver live.
+
+## Partner confirmed the ladder works end to end on hardware (Steps 2/5 behaviour)
+Two follow-ups from that pass:
+
+Ruling 11: DELIVERED no longer holds a flat 4s. Partner saw the tile go dark and then
+  re-light gold a moment later when they unlocked phone B — a `seen` can arrive right
+  up until the pending window closes, so a 4s hold left a visible gap in the middle
+  of one continuous event. DELIVERED now holds the pending window like SENT does.
+  Anchored to the SEND rather than to the receipt's arrival, via the new
+  PendingSends.remainingMs(): a flat window measured from when `delivered` happened
+  to land would leave the tile lit past the point where anything could still update
+  it — on a slow delivered that overhang is the whole delay, not a rounding error.
+  This is the partner's own words ("the same as the timeout for the message to be
+  seen") read literally: the seen deadline is measured from the send, so the tile's
+  is too. SEEN keeps its 4s — it is the one receipt state that is genuinely terminal.
+  Spec §7.1's table updated from "4s, then idle" to "until seen, or the window
+  closes". Tests: 40 passing (3 new remainingMs cases, WidgetStateTest updated).
+
+Ruling 12: ic_bubble_outline.xml loses its smiling face — partner wants the resting
+  tile to be an empty speech bubble. Checked the art before touching it rather than
+  assuming the face had to be added elsewhere: the face is DRAWN into the outline as
+  9 pixel cells but KNOCKED OUT of ic_bubble_filled.xml as negative space, so it
+  already appears on press exactly as the partner asked. The change is therefore a
+  pure deletion of those 9 cells, identified by differencing the outline's cell set
+  against ic_bubble_half.xml's (which never had a face) rather than by eyeballing
+  path data. Result: the idle frame is now geometrically identical to the half frame,
+  in the idle colour. FAILED also reuses this drawable tinted grey, so it loses the
+  face too — consistent, and worth knowing.
+
+## Task 7 Step 6 — DONE, invariant 3 verified against the LIVE server
+Phone A's bearer token read off the device with `run-as` (debug build), phone A is
+  person 1 ("Hubby", partner Wifey), and every row in `sends` is from_person=1 — so A
+  is the sender on all of them, which is what makes the refusal meaningful.
+  A (the SENDER) acknowledging its own send dd8dac87:
+    -> 403 {"error":"not_recipient"}  invariant 3 holds in production.
+Three controls run so the 403 could not be a blanket refusal:
+  - unknown send_id 00000000-...     -> 404 unknown_send  (the gate discriminates)
+  - no Authorization header          -> 401 unauthorized  (auth runs first)
+  - row re-queried after the refusal -> delivered_at and seen_at BOTH unchanged at
+    1787738427, confirming the 403 happens before any write, not after a partial one.
+Unplanned but valuable: the D1 rows are independent evidence that BOTH new seen paths
+  work on hardware, which no unit test covers.
+  - dd8dac87: delivered_at == seen_at == 1787738427. Same second — the already-awake
+    path firing seen at notification time, exactly Ruling 8's first branch.
+  - bd518a22: delivered_at 1787738331, seen_at 1787738390. Fifty-nine seconds later:
+    the unlock path, and well outside the 20s tile window — recorded but never
+    displayed, which is precisely Ruling 8b's split of uncapped recording from capped
+    display, observed in production rather than argued.
+Partner also confirmed Step 3 (the timeout) passes and that FAILED losing the face is
+  wanted, not a regression. Steps 2,3,4,5,6 all now verified. Only Step 7 remains.
+
+## Toolchain note (not part of the plan)
+Phone B's wireless-debugging port kept rotating (39881 -> 36681 -> 41853), because
+  Android 11+ wireless debugging assigns a fresh random port every time it restarts.
+  Switched B to the legacy fixed-port mode with `adb tcpip 5555`; `service.adb.tcp.port`
+  now reads 5555 and B reconnects as 192.168.10.28:5555. Survives Wi-Fi drops and
+  screen-off, but NOT a reboot — adbd returns to the random-port mode then, and the
+  command must be re-run over USB or over a fresh wireless-debugging session.
