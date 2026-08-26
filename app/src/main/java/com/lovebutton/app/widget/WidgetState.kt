@@ -43,3 +43,41 @@ val WidgetState.holdMillis: Long?
  */
 fun fromName(name: String?): WidgetState =
     WidgetState.entries.firstOrNull { it.name == name } ?: WidgetState.IDLE
+
+/**
+ * How far along the ladder a state sits.
+ *
+ * Explicit rather than the enum's own ordinal: the declaration order is a
+ * historical accident, and a reorder for readability must not silently change
+ * which receipt wins a race.
+ *
+ * FAILED sits above SENT and below the receipts on purpose. It has to be able
+ * to follow SENDING, or a send whose request threw would sit on "sending…"
+ * forever; and a receipt has to be able to follow it, because a receipt can only
+ * exist if the send reached the server, which is better evidence than this
+ * phone's own failed request.
+ */
+private val WidgetState.ladderRank: Int
+    get() = when (this) {
+        WidgetState.IDLE -> 0
+        WidgetState.SENDING -> 1
+        WidgetState.SENT -> 2
+        WidgetState.FAILED -> 3
+        WidgetState.DELIVERED -> 4
+        WidgetState.SEEN -> 5
+    }
+
+/**
+ * Whether moving from this state to [next] is a step forward.
+ *
+ * The ladder only ever moves forward, because the two receipts do not arrive in
+ * order. The recipient reports `delivered` and `seen` as two independent
+ * WorkManager jobs which run concurrently, and on hardware `seen` was observed
+ * arriving 54ms *before* the `delivered` for the same send. Written in arrival
+ * order, that late `delivered` undid the `seen` — the sender's screen stuck on
+ * "it buzzed her phone" and never reached gold again.
+ *
+ * Resets are deliberately not expressed here: returning a tile to IDLE, or
+ * starting a new send, replaces the record outright rather than advancing it.
+ */
+fun WidgetState.advancesTo(next: WidgetState): Boolean = next.ladderRank > ladderRank

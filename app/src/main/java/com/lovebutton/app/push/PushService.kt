@@ -6,9 +6,9 @@ import com.lovebutton.app.data.CurrentSend
 import com.lovebutton.app.data.PendingSends
 import com.lovebutton.app.data.UnseenSends
 import com.lovebutton.app.widget.WidgetState
+import com.lovebutton.app.widget.advanceWidgetState
 import com.lovebutton.app.widget.clearWidgetStateIf
 import com.lovebutton.app.widget.holdMillis
-import com.lovebutton.app.widget.setWidgetState
 import com.lovebutton.app.work.ReceiptWorker
 import com.lovebutton.app.work.RegisterTokenWorker
 import kotlinx.coroutines.CoroutineScope
@@ -71,7 +71,7 @@ class PushService : FirebaseMessagingService() {
                     // up for something sent an hour ago is confusing.
                     val appWidgetId = pending.widgetFor(sendId) ?: return@launch
 
-                    setWidgetState(applicationContext, appWidgetId, state)
+                    advanceWidgetState(applicationContext, appWidgetId, state)
                     // `delivered` deliberately does not forget the entry: `seen`
                     // may still arrive within the window and needs the mapping.
                     if (state == WidgetState.SEEN) pending.forget(sendId)

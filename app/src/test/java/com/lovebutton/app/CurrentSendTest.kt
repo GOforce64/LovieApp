@@ -96,4 +96,69 @@ class CurrentSendTest {
         assertEquals(WidgetState.SENDING, snap?.state)
         assertEquals(55L, snap?.at)
     }
+
+    /**
+     * The race observed on hardware, as a test.
+     *
+     * The recipient reports `delivered` and `seen` as two concurrent jobs, so the
+     * sender can receive them in either order — measured as `seen` first and
+     * `delivered` 54ms behind it. Without this the later `delivered` overwrote
+     * the `seen` and the focal area never reached gold again for the rest of the
+     * session.
+     */
+    @Test
+    fun `a delivered arriving after a seen does not undo it`() = runTest {
+        val store = CurrentSend(context)
+        store.start("raced", msgId = 1)
+        store.update("raced", WidgetState.SEEN)
+        store.update("raced", WidgetState.DELIVERED)
+
+        assertEquals(WidgetState.SEEN, store.current()?.state)
+    }
+
+    @Test
+    fun `a slow send response does not undo a receipt that beat it`() = runTest {
+        // SendWorker writes SENT when its own POST returns, which can be after the
+        // receipt for that same send has already arrived by push.
+        val store = CurrentSend(context)
+        store.start("beaten", msgId = 1)
+        store.update("beaten", WidgetState.SEEN)
+        store.update("beaten", WidgetState.SENT)
+
+        assertEquals(WidgetState.SEEN, store.current()?.state)
+    }
+
+    @Test
+    fun `the ladder still advances the whole way`() = runTest {
+        val store = CurrentSend(context)
+        store.start("orderly", msgId = 1)
+        listOf(WidgetState.SENT, WidgetState.DELIVERED, WidgetState.SEEN).forEach {
+            store.update("orderly", it)
+        }
+
+        assertEquals(WidgetState.SEEN, store.current()?.state)
+    }
+
+    @Test
+    fun `a failure is still recorded`() = runTest {
+        val store = CurrentSend(context)
+        store.start("doomed", msgId = 1)
+        store.update("doomed", WidgetState.FAILED)
+
+        assertEquals(WidgetState.FAILED, store.current()?.state)
+    }
+
+    @Test
+    fun `a new send starts over even after a seen`() = runTest {
+        // start() is the reset. Monotonicity governs one send's ladder, not the
+        // store, or the second message of the evening could never leave gold.
+        val store = CurrentSend(context)
+        store.start("first", msgId = 1)
+        store.update("first", WidgetState.SEEN)
+        store.start("second", msgId = 2)
+
+        val snap = store.current()
+        assertEquals("second", snap?.sendId)
+        assertEquals(WidgetState.SENDING, snap?.state)
+    }
 }

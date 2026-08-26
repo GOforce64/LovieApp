@@ -16,15 +16,46 @@ import androidx.glance.appwidget.state.updateAppWidgetState
  * A widget the user has since removed resolves to null; that is not an error and
  * must not fail the send that triggered it.
  */
-suspend fun setWidgetState(context: Context, appWidgetId: Int, state: WidgetState) {
+suspend fun setWidgetState(context: Context, appWidgetId: Int, state: WidgetState) =
+    writeWidgetState(context, appWidgetId, state, onlyForward = false)
+
+/**
+ * Writes a state only if it is further along the ladder than what is showing.
+ *
+ * For the receipt path, where the two receipts for one send are reported as
+ * concurrent jobs and arrive in either order — a `delivered` trailing its own
+ * `seen` would otherwise repaint the gold tile pink. See [advancesTo].
+ *
+ * Deliberately not the behaviour of [setWidgetState]: returning a tile to IDLE
+ * is a reset, not a step backwards, and a guard here would strand every tile on
+ * the last thing it showed.
+ */
+suspend fun advanceWidgetState(context: Context, appWidgetId: Int, state: WidgetState) =
+    writeWidgetState(context, appWidgetId, state, onlyForward = true)
+
+private suspend fun writeWidgetState(
+    context: Context,
+    appWidgetId: Int,
+    state: WidgetState,
+    onlyForward: Boolean,
+) {
     if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
 
     val manager = GlanceAppWidgetManager(context)
     val glanceId = runCatching { manager.getGlanceIdBy(appWidgetId) }.getOrNull() ?: return
 
+    var wrote = false
     updateAppWidgetState(context, glanceId) { prefs ->
+        if (onlyForward && !fromName(prefs[KEY_STATE]).advancesTo(state)) {
+            return@updateAppWidgetState
+        }
         prefs[KEY_STATE] = state.name
+        wrote = true
     }
+
+    // Nothing changed, so nothing to redraw — and redrawing anyway would cost a
+    // RemoteViews round trip per dropped receipt.
+    if (!wrote) return
 
     // Each widget class owns its own instances, so the redraw has to go through
     // the class that actually holds this id. Asking the wrong one writes the

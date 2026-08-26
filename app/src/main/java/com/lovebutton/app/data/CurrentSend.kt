@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.lovebutton.app.widget.WidgetState
+import com.lovebutton.app.widget.advancesTo
 import com.lovebutton.app.widget.fromName
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -69,16 +70,23 @@ class CurrentSend(private val context: Context) {
     }
 
     /**
-     * Advances the stored send, and only if it IS the stored send.
+     * Advances the stored send, and only if it IS the stored send, and only
+     * forward.
      *
-     * Receipts arrive by push and can land after the user has sent something
-     * else. Without this guard an old `seen` would light the focal area for a
-     * message that is no longer on screen — the read and the compare happen
-     * inside one edit block so a concurrent writer cannot land between them.
+     * Two guards, for two different races. The id check: receipts arrive by push
+     * and can land after the user has sent something else, and without it an old
+     * `seen` would light the focal area for a message that is no longer on
+     * screen. The rank check: the two receipts for one send are reported
+     * concurrently and arrive in either order, so a `delivered` trailing a
+     * `seen` must not drag the ladder back down — see [advancesTo].
+     *
+     * Both the read and the compare happen inside one edit block, so a
+     * concurrent writer cannot land between them.
      */
     suspend fun update(sendId: String, state: WidgetState) {
         context.currentSendStore.edit { prefs ->
-            if (prefs[Keys.SEND_ID] == sendId) {
+            if (prefs[Keys.SEND_ID] != sendId) return@edit
+            if (fromName(prefs[Keys.STATE]).advancesTo(state)) {
                 prefs[Keys.STATE] = state.name
             }
         }
