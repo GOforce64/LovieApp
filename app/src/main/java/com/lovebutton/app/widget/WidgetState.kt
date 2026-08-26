@@ -24,7 +24,14 @@ val WidgetState.holdMillis: Long?
         // dropping to idle sooner would hide a delivered that was on its way.
         WidgetState.SENT -> PENDING_WINDOW_MS
         WidgetState.FAILED -> 3_000L
-        WidgetState.DELIVERED, WidgetState.SEEN -> 4_000L
+        // DELIVERED waits out the same window as SENT, for the same reason: a
+        // `seen` can arrive right up until the window closes, and a four-second
+        // hold made the tile go dark and then light up again a moment later when
+        // she picked her phone up. One continuous tile beats a blink.
+        WidgetState.DELIVERED -> PENDING_WINDOW_MS
+        // SEEN is terminal — nothing further can arrive for this send — so it is
+        // the one receipt state that really is done after its four seconds.
+        WidgetState.SEEN -> 4_000L
     }
 
 /**

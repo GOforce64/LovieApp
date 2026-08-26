@@ -77,8 +77,6 @@ fun ensureChannels(context: Context) {
 }
 
 /** Extra carrying the send id from a notification tap into MainActivity. */
-const val EXTRA_SEND_ID = "send_id"
-
 /**
  * Posts one notification for a received message.
  *
@@ -89,21 +87,20 @@ fun postMessageNotification(
     context: Context,
     msgId: Int,
     fromName: String,
-    sendId: String? = null,
 ) {
     val message = messageForId(msgId)
     val text = message?.text ?: "New message"
     val channelId = message?.channelId ?: DEV_CHANNEL_ID
 
+    // One shared PendingIntent is correct now that the intent carries no send id:
+    // every notification opens the same screen, so there is nothing per-send left
+    // for FLAG_UPDATE_CURRENT to overwrite. Seen is reported on unlock instead of
+    // on a tap, which is why the extra is gone — see UnlockReceiver.
     val openApp = PendingIntent.getActivity(
         context,
-        // A per-send request code: with a constant one, FLAG_UPDATE_CURRENT would
-        // rewrite every earlier notification's intent to carry the newest send id,
-        // so tapping an older notification would report "seen" for the wrong send.
-        sendId?.hashCode() ?: 0,
+        0,
         Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .putExtra(EXTRA_SEND_ID, sendId),
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 

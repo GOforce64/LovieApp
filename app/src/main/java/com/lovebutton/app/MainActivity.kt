@@ -14,24 +14,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.lovebutton.app.data.Prefs
-import com.lovebutton.app.push.EXTRA_SEND_ID
 import com.lovebutton.app.ui.EnrolScreen
 import com.lovebutton.app.ui.HomeScreen
 import com.lovebutton.app.ui.SetupScreen
 import com.lovebutton.app.ui.LoveButtonTheme
-import com.lovebutton.app.work.ReceiptWorker
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        reportSeenFrom(intent)
         setContent {
             LoveButtonTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
@@ -44,22 +39,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // The notification intent sets FLAG_ACTIVITY_SINGLE_TOP (with CLEAR_TOP),
-        // which routes a notification tap to this callback when this activity is
-        // already on top, instead of destroying and recreating it. This ensures
-        // the seen report is delivered and avoids unnecessarily rebuilding the UI.
+        // which resumes this activity in place on a notification tap instead of
+        // destroying and rebuilding the whole Compose tree.
         setIntent(intent)
-        reportSeenFrom(intent)
-    }
-
-    private fun reportSeenFrom(intent: Intent?) {
-        val sendId = intent?.getStringExtra(EXTRA_SEND_ID) ?: return
-        // Cleared synchronously so a configuration change cannot report the same
-        // tap twice. The read-receipt toggle is checked inside ReceiptWorker
-        // rather than here: WorkManager owns the work from the moment it is
-        // enqueued, so a rotation between the tap and the preference read cannot
-        // lose a report that was genuinely earned.
-        intent.removeExtra(EXTRA_SEND_ID)
-        ReceiptWorker.enqueue(this, sendId, "seen")
     }
 }
 
@@ -89,17 +71,9 @@ private fun Root() {
         }
         enrolment == null -> EnrolScreen(onEnrolled = { /* state flow re-emits */ })
         showSetup -> SetupScreen(onDone = { showSetup = false })
-        else -> {
-            val readReceipts by prefs.readReceipts.collectAsState(initial = true)
-            val scope = rememberCoroutineScope()
-            HomeScreen(
-                partnerName = enrolment!!.partnerName,
-                readReceipts = readReceipts,
-                onReadReceiptsChange = { enabled ->
-                    scope.launch { prefs.setReadReceipts(enabled) }
-                },
-                onOpenSetup = { showSetup = true },
-            )
-        }
+        else -> HomeScreen(
+            partnerName = enrolment!!.partnerName,
+            onOpenSetup = { showSetup = true },
+        )
     }
 }

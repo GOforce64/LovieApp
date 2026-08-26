@@ -3,6 +3,7 @@ package com.lovebutton.app.push
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.lovebutton.app.data.PendingSends
+import com.lovebutton.app.data.UnseenSends
 import com.lovebutton.app.widget.WidgetState
 import com.lovebutton.app.widget.clearWidgetStateIf
 import com.lovebutton.app.widget.holdMillis
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Receives data-only pushes.
@@ -37,12 +39,13 @@ class PushService : FirebaseMessagingService() {
                 val msgId = data["msg_id"]?.toIntOrNull() ?: return
                 val fromName = data["from_name"] ?: "Someone"
                 val sendId = data["send_id"]
-                postMessageNotification(applicationContext, msgId, fromName, sendId)
+                postMessageNotification(applicationContext, msgId, fromName)
                 // After posting, not before: the receipt says "it arrived and she
                 // can see it", and a receipt for a notification that failed to
                 // post would be a lie.
                 if (sendId != null) {
                     ReceiptWorker.enqueue(applicationContext, sendId, "delivered")
+                    reportOrRememberSeen(sendId)
                 }
             }
             "receipt" -> {
@@ -66,11 +69,40 @@ class PushService : FirebaseMessagingService() {
                     // may still arrive within the window and needs the mapping.
                     if (state == WidgetState.SEEN) pending.forget(sendId)
 
-                    delay(state.holdMillis ?: 0L)
+                    // DELIVERED is still waiting for a `seen`, so it holds for
+                    // whatever is left of the window rather than a flat duration
+                    // from now — see PendingSends.remainingMs. SEEN is terminal and
+                    // uses its own short hold.
+                    val hold = when (state) {
+                        WidgetState.DELIVERED -> pending.remainingMs(sendId)
+                        else -> state.holdMillis ?: 0L
+                    }
+                    delay(hold)
                     clearWidgetStateIf(applicationContext, appWidgetId, state)
                 }
             }
             else -> Unit
+        }
+    }
+
+    /**
+     * Decides, at the moment the notification lands, whether it has been seen.
+     *
+     * Seen no longer means "she tapped it" — it means she looked at the screen.
+     * If the phone is awake and unlocked she is already looking at it, so report
+     * immediately; otherwise the message waits for [UnlockReceiver] to report it
+     * on the next unlock.
+     *
+     * `runBlocking` rather than a launched coroutine: this method runs on FCM's
+     * own background thread, and the wakelock behind `onMessageReceived` ends
+     * when it returns. A fire-and-forget write could lose the id to process death
+     * in exactly the case this exists for — a phone that is asleep.
+     */
+    private fun reportOrRememberSeen(sendId: String) {
+        if (couldBeLookingNow(applicationContext)) {
+            ReceiptWorker.enqueue(applicationContext, sendId, "seen")
+        } else {
+            runBlocking { UnseenSends(applicationContext).remember(sendId) }
         }
     }
 }

@@ -11,7 +11,6 @@ import androidx.work.WorkerParameters
 import com.lovebutton.app.BuildConfig
 import com.lovebutton.app.data.LoveButtonApi
 import com.lovebutton.app.data.Prefs
-import kotlinx.coroutines.flow.first
 
 /**
  * Reports a receipt back to the server.
@@ -29,13 +28,6 @@ class ReceiptWorker(
         val sendId = inputData.getString(KEY_SEND_ID) ?: return Result.failure()
         val state = inputData.getString(KEY_STATE) ?: return Result.failure()
         val enrolment = Prefs(applicationContext).current() ?: return Result.failure()
-
-        // Read here rather than at the tap so no lifecycle event can lose the
-        // report. Only "seen" is a choice: "delivered" says the phone received
-        // the message, not that she read it, and is always reported (spec §6.4).
-        if (state == "seen" && !Prefs(applicationContext).readReceipts.first()) {
-            return Result.success()
-        }
 
         return try {
             LoveButtonApi(BuildConfig.API_BASE_URL).receipt(enrolment.authToken, sendId, state)
