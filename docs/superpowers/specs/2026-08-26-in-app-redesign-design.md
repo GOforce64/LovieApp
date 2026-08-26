@@ -96,7 +96,7 @@ Warm and plain. These are read hundreds of times; the quiet ones wear out slowes
 | Sent | `on its way to {partner}` |
 | Delivered | `it buzzed her phone` |
 | Seen | `{partner} saw it ♡` |
-| Failed | `didn't get through — it'll retry` |
+| Failed | `didn't get through :(` |
 | Cold open | `{partner} saw your "{message}" · {age} ago` |
 
 "her phone" is written from the sending phone's point of view; the delivered line
@@ -137,14 +137,22 @@ incapable of showing a colour the widget does not draw.
 
 | State | Picture | Line |
 |---|---|---|
-| Idle | `ic_heart_outline` | nothing sent yet |
-| Sending | `ic_heart_half` | on its way |
-| Sent | `ic_heart_filled` (crimson) | the server has it |
-| Delivered | `ic_heart_delivered` (pink) | it buzzed her phone |
-| Seen | `ic_heart_seen` (pink + gold) | she looked at it |
-| Failed | `ic_heart_outline`, grey tint | didn't get through |
+| Idle | `ic_heart_outline` | click the button! |
+| Sending | `ic_heart_half` | on its way to {partner} 0o0 |
+| Sent | `ic_heart_filled` (crimson) | traveling in the interwebs (• ε •) |
+| Delivered | `ic_heart_delivered` (pink) | it buzzed {partner}'s phone :3 |
+| Seen | `ic_heart_seen` (pink + gold) | {partner} looked at it (>^o^)> |
+| Failed | `ic_heart_outline`, grey tint | didn't get through （◞‸◟）|
 
 Reached from Home, alongside Delivery setup.
+
+**The guide and the focal area speak differently, on purpose.** The guide is playful
+(kaomoji, exclamation marks) because you read it a handful of times, ever. The focal
+lines in §4.4 stay warm and plain because you read those hundreds of times and the
+loud ones wear out. Do not "fix" the inconsistency — it is the decision.
+
+Every line here that carries `{partner}` is substituted the same way §4.4's are, so
+the guide names the other person too.
 
 ---
 
