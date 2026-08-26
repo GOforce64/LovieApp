@@ -20,7 +20,6 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.unit.ColorProvider
-import com.lovebutton.app.R
 import com.lovebutton.app.data.messageForId
 
 /** Where a widget's current state is stored, per widget instance. */
@@ -49,13 +48,7 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
     @Composable
     private fun Tile(msgId: Int, state: WidgetState) {
         val message = messageForId(msgId)
-        val icon = when (state) {
-            WidgetState.IDLE, WidgetState.FAILED -> outlineIconFor(msgId)
-            WidgetState.SENDING -> halfIconFor(msgId)
-            WidgetState.SENT -> filledIconFor(msgId)
-            WidgetState.DELIVERED -> deliveredIconFor(msgId)
-            WidgetState.SEEN -> seenIconFor(msgId)
-        }
+        val icon = iconFor(msgId, state)
 
         Box(
             modifier = GlanceModifier
@@ -73,64 +66,9 @@ abstract class MessageWidget(private val msgId: Int) : GlanceAppWidget() {
                 // No background and no label, so the icon carries the whole tile.
                 // State therefore lives in the artwork: three fill stages, plus a
                 // tint for the one state that has no stage of its own.
-                colorFilter = tintFor(state),
+                colorFilter = tintColorFor(state)?.let { ColorFilter.tint(ColorProvider(Color(it))) },
                 modifier = GlanceModifier.fillMaxSize(),
             )
         }
     }
-}
-
-/**
- * The one state with no fill stage of its own.
- *
- * IDLE, SENDING and SENT are three stages of the same icon filling up, which
- * Android 12+ tweens between, so the tile reads as filling rather than as three
- * unrelated pictures. FAILED is not a point on that scale — it is the sequence
- * abandoned — so it reuses the outline greyed out. Nothing else is tinted: a tint
- * flattens every path to one colour and would throw away the border and the shine
- * that make the filled stage read as "landed".
- */
-private fun tintFor(state: WidgetState) = when (state) {
-    WidgetState.FAILED -> ColorFilter.tint(ColorProvider(Color(0xFFA9A2AD)))
-    else -> null
-}
-
-private fun outlineIconFor(msgId: Int): Int = when (msgId) {
-    1 -> R.drawable.ic_heart_outline
-    2 -> R.drawable.ic_bubble_outline
-    3 -> R.drawable.ic_paw_outline
-    4 -> R.drawable.ic_call_outline
-    else -> R.drawable.ic_heart_outline
-}
-
-private fun halfIconFor(msgId: Int): Int = when (msgId) {
-    1 -> R.drawable.ic_heart_half
-    2 -> R.drawable.ic_bubble_half
-    3 -> R.drawable.ic_paw_half
-    4 -> R.drawable.ic_call_half
-    else -> R.drawable.ic_heart_half
-}
-
-private fun filledIconFor(msgId: Int): Int = when (msgId) {
-    1 -> R.drawable.ic_heart_filled
-    2 -> R.drawable.ic_bubble_filled
-    3 -> R.drawable.ic_paw_filled
-    4 -> R.drawable.ic_call_filled
-    else -> R.drawable.ic_heart_filled
-}
-
-private fun deliveredIconFor(msgId: Int): Int = when (msgId) {
-    1 -> R.drawable.ic_heart_delivered
-    2 -> R.drawable.ic_bubble_delivered
-    3 -> R.drawable.ic_paw_delivered
-    4 -> R.drawable.ic_call_delivered
-    else -> R.drawable.ic_heart_delivered
-}
-
-private fun seenIconFor(msgId: Int): Int = when (msgId) {
-    1 -> R.drawable.ic_heart_seen
-    2 -> R.drawable.ic_bubble_seen
-    3 -> R.drawable.ic_paw_seen
-    4 -> R.drawable.ic_call_seen
-    else -> R.drawable.ic_heart_seen
 }
