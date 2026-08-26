@@ -2,6 +2,7 @@ package com.lovebutton.app.push
 
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.lovebutton.app.data.CurrentSend
 import com.lovebutton.app.data.PendingSends
 import com.lovebutton.app.data.UnseenSends
 import com.lovebutton.app.widget.WidgetState
@@ -58,6 +59,12 @@ class PushService : FirebaseMessagingService() {
                     else -> return
                 }
                 CoroutineScope(Dispatchers.Default).launch {
+                    // Before the widget lookup, deliberately: the widget mapping
+                    // expires after 20 seconds, but the app screen keeps the last
+                    // outcome (spec §4.3). Returning early on an expired widget
+                    // must not also skip the app.
+                    CurrentSend(applicationContext).update(sendId, state)
+
                     val pending = PendingSends(applicationContext)
                     // Null means the window expired or this app never sent it.
                     // Dropping it silently is the spec's answer: a tile lighting

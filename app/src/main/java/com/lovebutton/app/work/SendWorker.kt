@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.lovebutton.app.BuildConfig
+import com.lovebutton.app.data.CurrentSend
 import com.lovebutton.app.data.LoveButtonApi
 import com.lovebutton.app.data.PENDING_WINDOW_MS
 import com.lovebutton.app.data.PendingSends
@@ -57,8 +58,15 @@ class SendWorker(
             pending.remember(sendId, appWidgetId)
         }
 
+        // Written for EVERY send, widget or app. Spec §4.2: tapping a widget and
+        // then opening the app shows that send laddering, and this is what makes
+        // it free rather than a second code path.
+        val currentSend = CurrentSend(applicationContext)
+        currentSend.start(sendId, msgId)
+
         return try {
             LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId, sendId)
+            currentSend.update(sendId, WidgetState.SENT)
             // A delivered count of zero still counts as success: the send was
             // recorded, her phone just has no active device right now.
             settle(appWidgetId, WidgetState.SENT, Result.success())
@@ -67,6 +75,7 @@ class SendWorker(
             // SENDING indefinitely would be worse: a tile that never resolves reads
             // as a broken app rather than a failed send.
             pending.forget(sendId)
+            currentSend.update(sendId, WidgetState.FAILED)
             settle(appWidgetId, WidgetState.FAILED, Result.retry())
         }
     }
