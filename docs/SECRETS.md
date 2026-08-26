@@ -104,6 +104,35 @@ npx wrangler secret list --cwd server      # expect exactly the three names abov
 A green test run does **not** prove the secrets are right — the suites do not call
 Firebase. The real check is enrolling a phone and sending one message.
 
+### 3.4 What the bundle holds
+
+| Member | What it is | Recoverable without it? |
+|---|---|---|
+| `worker-secrets.env` | The three Cloudflare secrets | Only by regenerating — see §4 |
+| `google-services.json` | Firebase Android config | Yes, re-download from the Console |
+| `device-tokens.env` | The two phones' bearer tokens | Yes, by re-enrolling |
+| `SECRETS.md` | This file, so the runbook travels with the bundle | — |
+
+### 3.5 Encrypt it before it leaves this machine
+
+The tarball is `chmod 600` and gitignored, which protects it here and nowhere
+else. Encrypt it before putting it in cloud storage, and prefer a password
+manager attachment over a plain file share:
+
+```bash
+gpg --symmetric --cipher-algo AES256 lovie-secrets.tar.gz   # prompts for a passphrase
+shred -u lovie-secrets.tar.gz                               # only after verifying the .gpg opens
+```
+
+Verify before deleting the plaintext — decrypt it once and check the member list:
+
+```bash
+gpg --decrypt lovie-secrets.tar.gz.gpg | tar -tz
+```
+
+Put the passphrase in your password manager. A backup you cannot open is not a
+backup.
+
 ---
 
 ## 4. If you lost the backup entirely

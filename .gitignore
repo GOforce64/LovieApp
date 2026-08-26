@@ -28,3 +28,4 @@ worker-secrets.env
 # D1 dumps contain live bearer tokens
 *-d1-backup.sql
 lovie-d1-backup.sql
+device-tokens.env

@@ -90,6 +90,19 @@ while IFS='=' read -r key value; do
     esac
 done < <(grep -E '^[A-Z0-9_]+=' "$STAGE/worker-secrets.env" || true)
 
+# --- 3. Device bearer tokens (optional) ------------------------------------
+# Not configuration — these are issued by /v1/enroll and recoverable by simply
+# re-enrolling. They are carried anyway because they are what the spec's curl
+# examples need, and re-enrolling to get one back is a chore. Same precedence
+# rule as above: a loose edited file beats the copy inside the old bundle.
+if [ -f "$REPO_ROOT/device-tokens.env" ]; then
+    cp "$REPO_ROOT/device-tokens.env" "$STAGE/device-tokens.env"
+    echo "  [folded]  device-tokens.env from the repo root"
+elif [ -f "$OUT" ] && tar -tzf "$OUT" 2>/dev/null | grep -q "device-tokens.env"; then
+    tar -xzf "$OUT" -C "$STAGE" --wildcards --no-anchored 'device-tokens.env' 2>/dev/null \
+        && echo "  [reused]  device-tokens.env (from the existing $(basename "$OUT"))"
+fi
+
 cp "$REPO_ROOT/docs/SECRETS.md" "$STAGE/SECRETS.md" 2>/dev/null || true
 
 # Explicit basenames rather than ".", so members are stored as
@@ -97,7 +110,7 @@ cp "$REPO_ROOT/docs/SECRETS.md" "$STAGE/SECRETS.md" 2>/dev/null || true
 # `tar -xzf bundle worker-secrets.env` fails with "Not found in archive" —
 # which is precisely the command this script tells you to run.
 MEMBERS=()
-for f in SECRETS.md worker-secrets.env google-services.json; do
+for f in SECRETS.md worker-secrets.env google-services.json device-tokens.env; do
     [ -f "$STAGE/$f" ] && MEMBERS+=("$f")
 done
 tar -czf "$OUT" -C "$STAGE" "${MEMBERS[@]}"
