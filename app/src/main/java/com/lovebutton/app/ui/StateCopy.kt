@@ -3,22 +3,13 @@ package com.lovebutton.app.ui
 import com.lovebutton.app.widget.WidgetState
 
 /**
- * The words for each state, in two registers.
+ * The words for each state. One set, used everywhere a state is named.
  *
- * The guide is read a handful of times ever, so it is playful. The focal lines
- * are read hundreds of times, so they are warm and plain — loud copy wears out,
- * and this is the copy you will still be reading in a year. The split is
- * deliberate (spec §5); do not harmonise them.
+ * The focal area and the guide originally had their own registers — playful for
+ * the guide, plain for the focal line. Two vocabularies for six states made the
+ * guide read as an explanation of a different screen, so the plain set was
+ * dropped and this is what both show. See the design doc, §5.
  */
-fun focalLine(state: WidgetState, partnerName: String): String = when (state) {
-    WidgetState.IDLE -> "tap one below"
-    WidgetState.SENDING -> "sending…"
-    WidgetState.SENT -> "on its way to $partnerName"
-    WidgetState.DELIVERED -> "it buzzed her phone"
-    WidgetState.SEEN -> "$partnerName saw it ♡"
-    WidgetState.FAILED -> "didn't get through :("
-}
-
 fun guideLine(state: WidgetState, partnerName: String): String = when (state) {
     WidgetState.IDLE -> "click the button!"
     WidgetState.SENDING -> "on its way to $partnerName 0o0"

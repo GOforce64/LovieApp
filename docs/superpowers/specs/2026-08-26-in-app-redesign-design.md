@@ -146,10 +146,13 @@ incapable of showing a colour the widget does not draw.
 
 Reached from Home, alongside Delivery setup.
 
-**The guide and the focal area speak differently, on purpose.** The guide is playful
-(kaomoji, exclamation marks) because you read it a handful of times, ever. The focal
-lines in §4.4 stay warm and plain because you read those hundreds of times and the
-loud ones wear out. Do not "fix" the inconsistency — it is the decision.
+**The guide and the focal area speak with one voice.** They originally did not: the
+guide was playful (kaomoji, exclamation marks) because you read it a handful of times
+ever, and the focal lines were warm and plain because you read those hundreds of
+times and the loud ones wear out. Seen on hardware, the two vocabularies for the same
+six states read as a guide to some *other* screen, so the focal area now shows the
+guide's own line. There is one set of words per state, and the guide explains this
+screen in the words this screen uses.
 
 Every line here that carries `{partner}` is substituted the same way §4.4's are, so
 the guide names the other person too.

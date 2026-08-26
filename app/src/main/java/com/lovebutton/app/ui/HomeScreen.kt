@@ -113,7 +113,10 @@ fun HomeScreen(
                 )
                 Spacer(Modifier.size(12.dp))
                 Text(
-                    text = focalLine(state, partnerName),
+                    // The guide's words, deliberately: one voice for a state
+                    // wherever it appears, so the guide reads as an explanation
+                    // of this screen rather than a second vocabulary for it.
+                    text = guideLine(state, partnerName),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                 )
@@ -144,7 +147,9 @@ fun HomeScreen(
                 fill = stickerColorFor(message.id),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 10.dp)
+                    // Roughly tripled from the first hardware pass: at 10.dp the
+                    // four read as one block rather than four separate stickers.
+                    .padding(bottom = 28.dp)
                     .clickable {
                         // Haptic first, before the network call even starts. It
                         // lands immediately, which is what makes the tap feel
