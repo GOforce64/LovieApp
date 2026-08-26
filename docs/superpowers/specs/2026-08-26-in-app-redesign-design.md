@@ -102,6 +102,27 @@ Warm and plain. These are read hundreds of times; the quiet ones wear out slowes
 "her phone" is written from the sending phone's point of view; the delivered line
 does not need the partner's name because the seen line right after it does.
 
+### 4.5 The focal heart is animated
+
+The widget swaps between five finished pictures because `RemoteViews` can do little
+else. The app is Compose and is not limited that way, so the focal heart animates per
+pixel:
+
+| State | Motion |
+|---|---|
+| Sending | crimson rises row by row from the point upward, looping until the request returns — a slow network reads as "still going", not "stuck" |
+| Sent | the fill completes, then one short squash-and-settle |
+| Delivered | crimson turns to pink from the centre outward, a ring of pixels at a time |
+| Seen | the outline lights gold pixel by pixel around the shape, then a few pixels flash and fade |
+| Failed | two quick shakes, then the colour drains to grey |
+| Idle | the resting outline breathes, barely |
+
+*Seen* is the only state with a flourish, because it is the only state that is the
+point of the app.
+
+All six honour `prefers-reduced-motion` / the system animation scale by falling back
+to the plain state change.
+
 ---
 
 ## 5. The states guide
@@ -167,12 +188,14 @@ lets the app be redesigned freely without the guide starting to lie.
 A panda, with a hat and bamboo, in **four cute faces** — supplied by the partner, not
 generated here.
 
-**Mapping (inferred — overrule if wrong):** one face per message. The face appears on
-that message's button, and the focal area shows the face of whatever was last sent,
-beside the pixel heart running the ladder. Four assets serve both places.
+**Settled:** one face per message, sitting beside that message's button and
+**always visible** — not a reaction, not a state. The pandas are static artwork; the
+partner cannot source animation, and none is needed here.
 
-The ladder itself stays the pixel heart's job. The panda reacts; it does not encode
-state. Keeping state in one visual language is what keeps the guide honest.
+The panda does **not** appear in the focal area. The focal area is the pixel heart,
+animated (§4.5). Keeping state in exactly one visual language is what keeps the guide
+honest: if a panda also expressed state, the guide would have to teach two vocabularies
+and would immediately be incomplete.
 
 ### 7.1 Asset manifest
 
@@ -186,6 +209,7 @@ What the partner needs to supply:
 | `panda_call.webp` | face for "Call me when you can" |
 
 - **512 × 512**, transparent background, WebP (or PNG — the build converts).
+- **Static images only.** No animation, no sprite sheets, no Lottie.
 - Panda centred with roughly 8% padding, so it can be cropped to a circle later
   without losing the hat.
 - Same hat and bamboo across all four; **only the face changes**. That consistency
@@ -223,7 +247,14 @@ was rejected on hardware.** It is a loaded gun pointed at a decision that has al
 been made.
 
 Fix: update the constants and their comments to match, then re-run it and confirm the
-output is byte-identical to the committed drawables. If it is not, the generator has
+output is byte-identical to the committed drawables.
+
+**The generator also gains a Kotlin emitter.** Animating individual pixels (§4.5)
+means the app needs the grids as *data*, not as finished VectorDrawables. So
+`pixel_icons.py` writes a Kotlin source file of the same grids alongside the XML it
+already produces. One source of truth: the animated heart in the app and the static
+heart on the home screen are generated from the same ASCII art in the same run, and
+cannot drift. Hand-copying the grids into Kotlin would guarantee they eventually do. If it is not, the generator has
 drifted in some other way too, and that difference is the real finding.
 
 Not a defect, and not to be "fixed": `ic_call_seen.xml` is drawn entirely in gold.
@@ -242,6 +273,7 @@ for that icon. The generator documents this. Leave it alone.
 | `CurrentSend` | Robolectric, like `PendingSends` |
 | Generator fix | Re-run, diff output against committed drawables |
 | The ladder end to end | Hardware, two phones — same as Plan 4 |
+| Kotlin grid emitter | Generated grids compared against the committed drawables' cells |
 
 The ladder cannot be unit tested for the same reason the widget's could not: it spans
 a worker, a push handler and a UI. Hardware is the gate, and that is stated here so
@@ -260,10 +292,11 @@ No server change. No API change. No migration.
 
 ---
 
-## 12. Open question for review
+## 12. Resolved
 
-**§7's mapping.** Four panda faces, one per message — versus one per ladder state.
-The message mapping is chosen because the partner raised the faces while discussing
-the message buttons, and because state already has a visual language (the pixel
-heart) that must not be duplicated. Worth confirming before art is commissioned,
-since it is the one decision here that costs money to redo.
+**The panda mapping is settled** (§7): four static faces, one per message, always
+visible beside their button, never expressing state. Confirmed by the partner before
+any art is commissioned, which was the point of raising it.
+
+**Division of labour, plainly:** the partner supplies four static panda images; every
+piece of motion in this design is generated from the pixel grids and built here.
