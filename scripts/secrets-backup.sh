@@ -54,7 +54,9 @@ elif [ -f "./worker-secrets.env" ]; then
     PREV_ENV="edited"
     echo "  [folded]  worker-secrets.env from $(pwd)"
 elif [ -f "$OUT" ] && tar -tzf "$OUT" 2>/dev/null | grep -q "worker-secrets.env"; then
-    tar -xzf "$OUT" -C "$STAGE" worker-secrets.env 2>/dev/null && PREV_ENV="bundle"
+    # Wildcard so this also reads bundles written before the ./ prefix was fixed.
+    tar -xzf "$OUT" -C "$STAGE" --wildcards --no-anchored 'worker-secrets.env' 2>/dev/null \
+        && PREV_ENV="bundle"
     echo "  [reused]  worker-secrets.env (from the existing $(basename "$OUT"))"
 fi
 
@@ -90,7 +92,15 @@ done < <(grep -E '^[A-Z0-9_]+=' "$STAGE/worker-secrets.env" || true)
 
 cp "$REPO_ROOT/docs/SECRETS.md" "$STAGE/SECRETS.md" 2>/dev/null || true
 
-tar -czf "$OUT" -C "$STAGE" .
+# Explicit basenames rather than ".", so members are stored as
+# `worker-secrets.env` and not `./worker-secrets.env`. With the ./ prefix,
+# `tar -xzf bundle worker-secrets.env` fails with "Not found in archive" —
+# which is precisely the command this script tells you to run.
+MEMBERS=()
+for f in SECRETS.md worker-secrets.env google-services.json; do
+    [ -f "$STAGE/$f" ] && MEMBERS+=("$f")
+done
+tar -czf "$OUT" -C "$STAGE" "${MEMBERS[@]}"
 chmod 600 "$OUT"
 
 echo

@@ -79,8 +79,12 @@ by hand or the script is unavailable.
 ### 3.2 Restore the secrets
 
 ```bash
+# 0. Unpack the bundle if you are doing this by hand
+tar -xzf lovie-secrets.tar.gz            # members: SECRETS.md, worker-secrets.env,
+                                         #          google-services.json
+
 # 1. Firebase Android config
-cp <backup>/google-services.json app/google-services.json
+cp google-services.json app/google-services.json
 
 # 2. The three Worker secrets (each prompts for the value on stdin)
 cd server
