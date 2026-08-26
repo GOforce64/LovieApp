@@ -21,3 +21,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 app/build/
+
+# secret bundles produced by scripts/secrets-backup.sh — these hold real values
+lovie-secrets*.tar.gz
+worker-secrets.env
+# D1 dumps contain live bearer tokens
+*-d1-backup.sql
+lovie-d1-backup.sql
