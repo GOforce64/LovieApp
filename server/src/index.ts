@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import type { App } from "./env";
+import type { App, Env } from "./env";
 import { fail } from "./http";
 import { enroll } from "./routes/enroll";
 import { devices } from "./routes/devices";
 import { send } from "./routes/send";
 import { receipts } from "./routes/receipts";
+import { purgeOldSends, RETENTION_DAYS } from "./retention";
 
 const app = new Hono<App>();
 
@@ -30,4 +31,24 @@ app.onError((err, c) => {
   return fail(c, 500, "internal_error", "Something went wrong.");
 });
 
-export default app;
+/**
+ * Both entry points the Worker has: HTTP, and the daily cron.
+ *
+ * This is an object rather than the bare Hono app because a Worker can only
+ * expose a `scheduled` handler from a default-exported handler object. The
+ * `fetch` line preserves exactly what `export default app` did before.
+ */
+export default {
+  fetch: app.fetch,
+
+  /**
+   * Awaited rather than handed to `ctx.waitUntil`, so a failed purge surfaces
+   * as a failed cron invocation in the dashboard instead of disappearing. The
+   * next night's run retries it by simply existing — there is nothing to catch
+   * up, since the query is defined by a cutoff rather than by a cursor.
+   */
+  async scheduled(_controller, env: Env) {
+    const deleted = await purgeOldSends(env);
+    console.log(`retention: deleted ${deleted} sends past ${RETENTION_DAYS} days`);
+  },
+} satisfies ExportedHandler<Env>;
