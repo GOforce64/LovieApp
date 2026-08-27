@@ -1,32 +1,47 @@
 package com.lovebutton.app.ui
 
 import android.Manifest
+import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.lovebutton.app.data.DeliverySetup
 import com.lovebutton.app.device.areNotificationsEnabled
 import com.lovebutton.app.device.isIgnoringBatteryOptimisations
 import com.lovebutton.app.device.isNotificationPermissionPermanentlyDenied
@@ -36,19 +51,28 @@ import com.lovebutton.app.device.openBatteryOptimisationSettings
 import com.lovebutton.app.device.openMiuiAutostart
 import com.lovebutton.app.device.openMiuiBatterySaver
 import com.lovebutton.app.device.openNotificationSettings
+import kotlinx.coroutines.launch
 
 /**
- * The delivery setup checklist.
+ * Whether delivery is set up as far as this phone can tell.
  *
- * On MIUI three separate mechanisms will each independently stop pushes:
- * Autostart is off by default for sideloaded apps, battery saver defaults to
- * restricted, and unlocked apps get purged under memory pressure. None of this
- * can be fixed in code — the most an app can do is take you straight to each
- * setting and then re-check whether it stuck.
+ * The two Android checks are read live. The MIUI ones cannot be read at all, so
+ * on a Xiaomi they count only once they have been confirmed by hand — see
+ * [DeliverySetup]. Without that clause the home screen would stop nagging while
+ * Autostart was still off, which is the single likeliest reason a message never
+ * arrives, and the app would look ready while silently dropping everything.
  */
+fun deliveryReady(context: Context, miuiConfirmed: Boolean): Boolean =
+    areNotificationsEnabled(context) &&
+        isIgnoringBatteryOptimisations(context) &&
+        (!isProbablyXiaomi() || miuiConfirmed)
+
 @Composable
 fun SetupScreen(onDone: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val setup = remember { DeliverySetup(context) }
+    val miuiConfirmed by setup.miuiConfirmed.collectAsState(initial = false)
     var refresh by remember { mutableStateOf(0) }
 
     // Re-read the live state whenever the screen recomposes after returning
@@ -83,7 +107,15 @@ fun SetupScreen(onDone: () -> Unit) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Sticker.Ground)
+            // This screen had no inset handling at all, so under targetSdk 36 its
+            // heading sat behind the status bar. Outside the scroll, so the list
+            // stops at the bars rather than running under them.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Delivery setup", style = MaterialTheme.typography.headlineMedium)
@@ -92,6 +124,8 @@ fun SetupScreen(onDone: () -> Unit) {
                 "Check them again after a system update.",
             style = MaterialTheme.typography.bodyMedium,
         )
+
+        Spacer(Modifier.size(2.dp))
 
         CheckItem(
             title = "Notifications allowed",
@@ -123,11 +157,11 @@ fun SetupScreen(onDone: () -> Unit) {
             Text(
                 "Xiaomi / MIUI",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = 10.dp),
             )
 
-            // These two cannot be read back — MIUI exposes no API for either, so
-            // the app cannot show a tick. You have to confirm them by eye.
+            // These three cannot be read back — MIUI exposes no API for any of
+            // them, so the app cannot show a tick. You confirm them by eye below.
             CheckItem(
                 title = "Autostart enabled",
                 done = null,
@@ -148,14 +182,22 @@ fun SetupScreen(onDone: () -> Unit) {
                 detail = "Open the recent apps view, swipe down on Love Button " +
                     "(or long-press it) and tap the padlock.",
             )
+
+            ConfirmItem(
+                confirmed = miuiConfirmed,
+                onToggle = { scope.launch { setup.setMiuiConfirmed(!miuiConfirmed) } },
+            )
         }
 
-        Button(
+        Spacer(Modifier.size(6.dp))
+
+        StickerButton(
+            label = "Done",
             onClick = onDone,
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-        ) {
-            Text("Done")
-        }
+            fill = Sticker.Mint,
+            radius = 14,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -168,27 +210,107 @@ private fun CheckItem(
     onClick: () -> Unit,
     detail: String? = null,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            val marker = when (done) {
-                true -> "✓ "
-                false -> "✗ "
-                null -> "• "
+    // Colour carries the state before the marker does, the same way the four
+    // message stickers are told apart by hue before anyone reads them.
+    val fill = when (done) {
+        true -> Sticker.Mint
+        false -> Sticker.Blossom
+        null -> Sticker.Surface
+    }
+    StickerBox(fill = fill, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Marker(done)
+                Spacer(Modifier.size(10.dp))
+                Text(title, style = MaterialTheme.typography.titleSmall)
             }
-            Text("$marker$title", style = MaterialTheme.typography.titleSmall)
 
             detail?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 6.dp, start = 30.dp),
                 )
             }
 
             if (action != null && done != true) {
-                Button(onClick = onClick, modifier = Modifier.padding(top = 8.dp)) {
-                    Text(action)
-                }
+                StickerButton(
+                    label = action,
+                    onClick = onClick,
+                    fill = Sticker.Surface,
+                    radius = 11,
+                    modifier = Modifier.padding(top = 10.dp, start = 30.dp).width(104.dp),
+                )
+            }
+        }
+    }
+}
+
+/** A tick, a cross, or a question mark for the ones nothing can read. */
+@Composable
+private fun Marker(done: Boolean?) {
+    val glyph = when (done) {
+        true -> "✓"
+        false -> "✗"
+        null -> "?"
+    }
+    Box(
+        Modifier.size(20.dp).background(Sticker.Ink, RoundedCornerShapeAll),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            glyph,
+            style = MaterialTheme.typography.labelMedium,
+            color = Sticker.Surface,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private val RoundedCornerShapeAll = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
+
+/**
+ * The one check the user ticks themselves.
+ *
+ * Three MIUI settings above it report nothing back, so this is what turns the
+ * home screen's nudge off. It is deliberately a claim rather than a reading, and
+ * says so: pretending the app verified them would be worse than admitting it
+ * cannot.
+ */
+@Composable
+private fun ConfirmItem(confirmed: Boolean, onToggle: () -> Unit) {
+    StickerBox(
+        fill = if (confirmed) Sticker.Mint else Sticker.Butter,
+        modifier = Modifier.fillMaxWidth().clickable { onToggle() },
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(22.dp).background(
+                    if (confirmed) Sticker.Ink else Color.Transparent,
+                    RoundedCornerShapeAll,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (confirmed) "✓" else "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Sticker.Surface,
+                )
+            }
+            Spacer(Modifier.size(10.dp))
+            Column {
+                Text(
+                    if (confirmed) "The three above are done" else "Tap when you have done all three",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    "The phone cannot check these, so it takes your word for it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
         }
     }

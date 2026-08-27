@@ -1,14 +1,20 @@
 package com.lovebutton.app.ui
 
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.lovebutton.app.BuildConfig
@@ -41,39 +48,69 @@ fun EnrolScreen(onEnrolled: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Sticker.Ground)
+            // This screen had no inset handling either, so its heading sat under
+            // the status bar on an edge-to-edge window.
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Enter your code", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "You only do this once on this phone.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
-        )
+        // The one card on the screen, so the code entry reads as the single
+        // thing being asked for rather than as a form on a blank page.
+        StickerBox(fill = Sticker.Surface, radius = 22, modifier = Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 22.dp, horizontal = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Enter your code", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "You only do this once on this phone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+                )
 
-        OutlinedTextField(
-            value = code,
-            onValueChange = { code = it.trim() },
-            label = { Text("Enrolment code") },
-            singleLine = true,
-            enabled = !busy,
-            modifier = Modifier.fillMaxWidth(),
-        )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.trim() },
+                    label = { Text("Enrolment code") },
+                    singleLine = true,
+                    enabled = !busy,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Sticker.Ink,
+                        unfocusedBorderColor = Sticker.Ink,
+                        focusedLabelColor = Sticker.Ink,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-        error?.let {
-            Text(
-                it,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 12.dp),
-            )
+                error?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+            }
         }
 
+        Spacer(Modifier.size(18.dp))
+
         if (busy) {
-            CircularProgressIndicator(modifier = Modifier.padding(top = 24.dp))
+            CircularProgressIndicator(color = Sticker.Ink, modifier = Modifier.padding(top = 8.dp))
         } else {
-            Button(
+            StickerButton(
+                label = "Enrol this phone",
+                fill = Sticker.Mint,
+                radius = 14,
+                enabled = code.length >= 8,
+                modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     error = null
                     busy = true
@@ -124,11 +161,7 @@ fun EnrolScreen(onEnrolled: () -> Unit) {
                         }
                     }
                 },
-                enabled = code.length >= 8,
-                modifier = Modifier.padding(top = 24.dp),
-            ) {
-                Text("Enrol this phone")
-            }
+            )
         }
     }
 }

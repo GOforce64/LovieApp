@@ -3,7 +3,6 @@ package com.lovebutton.app.ui
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,23 +18,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lovebutton.app.R
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.lovebutton.app.data.CurrentSend
+import com.lovebutton.app.data.DeliverySetup
 import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.data.messageForId
 import com.lovebutton.app.widget.WidgetState
@@ -85,37 +89,6 @@ private val PandaOverhang = PandaHeight - MessageButtonHeight
  */
 private val PandaClearance = 30.dp
 
-/**
- * A sticker: flat colour, hard keyline, and a shallow offset shadow drawn as a
- * second box behind the first. Compose's elevation shadow is soft and would not
- * read as a sticker at all.
- */
-@Composable
-private fun StickerBox(
-    fill: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-    radius: Int = 16,
-    content: @Composable () -> Unit,
-) {
-    val shape = RoundedCornerShape(radius.dp)
-    Box(modifier) {
-        Box(
-            Modifier
-                .matchParentSize()
-                .offset(x = StickerShadow, y = StickerShadow)
-                .clip(shape)
-                .background(Sticker.Ink)
-        )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .background(fill)
-                .border(StickerKeyline, Sticker.Ink, shape)
-        ) { content() }
-    }
-}
-
 @Composable
 fun HomeScreen(
     partnerName: String,
@@ -126,6 +99,24 @@ fun HomeScreen(
     val view = LocalView.current
     val store = remember { CurrentSend(context) }
     val snapshot by store.flow.collectAsState(initial = null)
+
+    // `true` until DataStore answers, so an enrolled phone that is already set
+    // up does not flash the nudge on every launch.
+    val setup = remember { DeliverySetup(context) }
+    val miuiConfirmed by setup.miuiConfirmed.collectAsState(initial = true)
+    var setupRefresh by remember { mutableIntStateOf(0) }
+
+    // The two Android checks are read straight off the system, so they have to
+    // be re-read on the way back from the settings pages the setup screen opens.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) setupRefresh++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val ready = remember(setupRefresh, miuiConfirmed) { deliveryReady(context, miuiConfirmed) }
 
     Column(
         modifier = Modifier
@@ -249,22 +240,33 @@ fun HomeScreen(
 
         Spacer(Modifier.weight(1f))
 
+        // Until delivery setup is finished the second button is the loud one:
+        // it changes colour and changes what it says, and a line above it says
+        // why. Colouring the existing button rather than adding a banner keeps
+        // this screen the fixed height it has to be — there is no room for a
+        // block that appears and disappears without shunting something off the
+        // bottom, which is the bug this layout was just fixed for.
+        if (!ready) {
+            Text(
+                "Messages may not arrive until this is finished.",
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
+            )
+        }
+
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            listOf("What the colours mean" to onOpenGuide, "Delivery setup" to onOpenSetup)
-                .forEach { (label, action) ->
-                    StickerBox(
-                        fill = Sticker.Surface,
-                        radius = 13,
-                        modifier = Modifier.weight(1f).clickable { action() },
-                    ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 6.dp),
-                        )
-                    }
-                }
+            StickerButton(
+                label = "What the colours mean",
+                onClick = onOpenGuide,
+                modifier = Modifier.weight(1f),
+            )
+            StickerButton(
+                label = if (ready) "Delivery setup" else "Finish delivery setup",
+                onClick = onOpenSetup,
+                fill = if (ready) Sticker.Surface else Sticker.Butter,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
