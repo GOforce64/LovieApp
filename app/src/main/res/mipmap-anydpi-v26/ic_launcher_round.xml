@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The supplied artwork is a whole scene, not a centred glyph, so the
+         foreground carries it at 82% of the canvas: everything that matters
+         stays inside the 72dp the launcher is guaranteed to show. The
+         background is the same picture, full bleed and blurred, so a square
+         mask meets more picture rather than a flat ring. -->
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
