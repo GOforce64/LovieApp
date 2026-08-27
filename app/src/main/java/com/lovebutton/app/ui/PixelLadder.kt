@@ -54,8 +54,13 @@ private const val WALK_BUDGET = 300_000
 private const val BLINK_PERIOD_MS = 3400f
 private const val BLINK_CLOSE_MS = 260f
 
-/** How many cells to eat off each end of an eye, 0 to 2 and back over one blink. */
-private fun blinkAmount(phase: Float): Int {
+/**
+ * How many cells to eat off each end of an eye, 0 to 2 and back over one blink.
+ *
+ * Public for the same reason [fillRowsVisible] and [rippleReached] are: the
+ * shape of the motion is worth asserting, and none of it needs a Canvas.
+ */
+fun blinkAmount(phase: Float): Int {
     val t = phase * BLINK_PERIOD_MS
     if (t >= BLINK_CLOSE_MS) return 0
     val b = t / BLINK_CLOSE_MS

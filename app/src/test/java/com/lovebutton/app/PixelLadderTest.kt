@@ -1,11 +1,14 @@
 package com.lovebutton.app
 
+import com.lovebutton.app.ui.blinkAmount
 import com.lovebutton.app.ui.borderRingOrder
+import com.lovebutton.app.ui.eyesFor
 import com.lovebutton.app.ui.gildBoxFor
 import com.lovebutton.app.ui.gildOrder
 import com.lovebutton.app.ui.fillRowsVisible
 import com.lovebutton.app.ui.isBorderCell
 import com.lovebutton.app.ui.rippleReached
+import com.lovebutton.app.ui.shrinkEyes
 import com.lovebutton.app.widget.PixelGrids
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -165,5 +168,80 @@ class PixelLadderTest {
             }
         }
         return pieces
+    }
+
+    // ---- the blink ----
+
+    private val bubble = PixelGrids.GRIDS.getValue("bubble")
+    private val eyes = eyesFor("bubble")!!
+
+    /** Where the smile is, which the blink must never touch. */
+    private val smile = listOf(7 to 5, 7 to 10, 8 to 6, 8 to 7, 8 to 8, 8 to 9)
+
+    @Test
+    fun `the bubble grid still has the face this test assumes`() {
+        // The rest of these assertions are meaningless if the art moved, and a
+        // silently passing test would be worse than a failing one.
+        eyes.cols.forEach { c ->
+            assertTrue("no eye in column $c", (3..5).all { r -> bubble[r][c] == 'o' })
+        }
+        smile.forEach { (r, c) -> assertTrue("no smile at $r,$c", bubble[r][c] == 'o') }
+    }
+
+    @Test
+    fun `a blink closes the eyes and leaves the smile alone`() {
+        val closed = shrinkEyes(bubble, eyes, k = 2)
+        eyes.cols.forEach { c ->
+            (3..5).forEach { r ->
+                assertEquals("eye at $r,$c did not close", 'X', closed[r][c])
+            }
+        }
+        // The smile's raised corners stand in the eye columns, so this is the
+        // whole reason Eyes carries a maxRow at all.
+        smile.forEach { (r, c) ->
+            assertEquals("the blink ate the smile at $r,$c", 'o', closed[r][c])
+        }
+    }
+
+    @Test
+    fun `a half blink narrows the eyes from both ends`() {
+        val half = shrinkEyes(bubble, eyes, k = 1)
+        eyes.cols.forEach { c ->
+            assertEquals("top of the eye did not close", 'X', half[3][c])
+            assertEquals("middle of the eye closed too early", 'o', half[4][c])
+            assertEquals("bottom of the eye did not close", 'X', half[5][c])
+        }
+    }
+
+    @Test
+    fun `no blink changes nothing`() {
+        assertEquals(bubble, shrinkEyes(bubble, eyes, k = 0))
+        assertEquals(bubble, shrinkEyes(bubble, eyes = null, k = 2))
+    }
+
+    @Test
+    fun `a blink never touches a grid that has no eyes`() {
+        val heart = PixelGrids.GRIDS.getValue("heart")
+        assertEquals(heart, shrinkEyes(heart, eyesFor("heart"), k = 2))
+    }
+
+    @Test
+    fun `a blink shuts and reopens, and never overshoots`() {
+        var sawOpen = false
+        var sawShut = false
+        var phase = 0f
+        while (phase <= 1f) {
+            val k = blinkAmount(phase)
+            assertTrue("blink went out of range at $phase: $k", k in 0..2)
+            if (k == 0) sawOpen = true
+            if (k == 2) sawShut = true
+            phase += 0.0005f
+        }
+        assertTrue("the eyes never opened", sawOpen)
+        assertTrue("the eyes never shut", sawShut)
+        // Shut at the middle of the close window, open either side of it.
+        assertEquals(0, blinkAmount(0f))
+        assertEquals(2, blinkAmount(130f / 3400f))
+        assertEquals(0, blinkAmount(0.5f))
     }
 }
