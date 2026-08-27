@@ -1,8 +1,11 @@
 package com.lovebutton.app
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +35,16 @@ class MainActivity : ComponentActivity() {
         // window theme, and after that call the window is already showing.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // targetSdk 36 already lays the window out edge to edge, but it also
+        // enforces contrast behind the bars: with three-button navigation the
+        // system paints its own light scrim there, which reads as a white strip
+        // below the pink ground. Declaring both bars transparent turns that
+        // off — `light` is what says the bars sit on a pale background, so the
+        // clock and the navigation icons stay dark against it.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         setContent {
             LoveButtonTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
