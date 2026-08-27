@@ -24,8 +24,9 @@ import com.lovebutton.app.widget.WidgetState
 import com.lovebutton.app.widget.gridNameFor
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
-private fun isSolid(ch: Char) = ch == 'X' || ch == 's'
+private fun isSolid(ch: Char) = ch == 'X' || ch == 's' || ch == 'd'
 
 /** How many rows, counted from the bottom, the rising fill has covered. */
 fun fillRowsVisible(grid: List<String>, progress: Float): Int =
@@ -41,8 +42,26 @@ fun rippleReached(grid: List<String>, row: Int, col: Int, progress: Float): Bool
 
 private typealias Cell = Pair<Int, Int>
 
-/** Enough backtracking for an 11x11 icon; a walk needs a few thousand at most. */
+/** Enough backtracking for the shipped grids; a walk needs a few thousand at most. */
 private const val WALK_BUDGET = 300_000
+
+/**
+ * How often the face blinks, and how long a blink takes.
+ *
+ * Only while the face is lit: holes are not drawn on the resting outline, so
+ * there would be nothing to close.
+ */
+private const val BLINK_PERIOD_MS = 3400f
+private const val BLINK_CLOSE_MS = 260f
+
+/** How many cells to eat off each end of an eye, 0 to 2 and back over one blink. */
+private fun blinkAmount(phase: Float): Int {
+    val t = phase * BLINK_PERIOD_MS
+    if (t >= BLINK_CLOSE_MS) return 0
+    val b = t / BLINK_CLOSE_MS
+    val triangle = if (b < 0.5f) b * 2f else (1f - b) * 2f
+    return (triangle * 2f).roundToInt()
+}
 
 /**
  * The border cells split into pieces that actually touch each other.
@@ -118,7 +137,12 @@ fun borderRingOrder(grid: List<String>): List<Cell> {
     val cells = mutableListOf<Cell>()
     grid.forEachIndexed { r, row ->
         row.forEachIndexed { c, ch ->
-            if (isSolid(ch) && isBorderCell(grid, r, c)) cells.add(r to c)
+            // Plain solid only. A shine cell keeps its highlight in the seen
+            // state and a shade cell keeps its shadow, so neither ever turns
+            // gold — - carrying them in the ring would spend a third of the
+            // phone's gild on cells that visibly do nothing, and the light
+            // would appear to stall as it crossed the shaded side.
+            if (ch == 'X' && isBorderCell(grid, r, c)) cells.add(r to c)
         }
     }
     if (cells.isEmpty()) return emptyList()
@@ -130,6 +154,28 @@ fun borderRingOrder(grid: List<String>): List<Cell> {
     }
 
     return componentsOf(cells, neighbours).flatMap { walkOnce(it, neighbours) ?: it }
+}
+
+/**
+ * The cells that turn gold on `seen`, in the order they light.
+ *
+ * Most icons run the gold around their outline. An icon with a gild box lights
+ * that box instead, row by row — for the phone that is the screen coming on and
+ * then the keypad going down, which reads as the handset waking rather than as a
+ * frame being drawn.
+ */
+fun gildOrder(gridName: String, grid: List<String>): List<Cell> {
+    val box = gildBoxFor(gridName) ?: return borderRingOrder(grid)
+    val cells = mutableListOf<Cell>()
+    for (r in box.rows) {
+        if (r !in grid.indices) continue
+        for (c in box.cols) {
+            if (c !in grid[r].indices) continue
+            val ch = grid[r][c]
+            if (ch == 's' || ch == 'd') cells.add(r to c)
+        }
+    }
+    return cells
 }
 
 /**
@@ -177,48 +223,68 @@ fun AnimatedPixelIcon(msgId: Int, state: WidgetState, modifier: Modifier = Modif
         shot = 1f
     }
 
+    val blinkPhase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = BLINK_PERIOD_MS.toInt(), easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "blink",
+    )
+
     // With animations off, every state renders as its plain finished picture.
     val progress = if (!animationsOn) 1f else when (state) {
         WidgetState.SENDING -> loop
         else -> shot
     }
-    val ring = remember(grid) { borderRingOrder(grid) }
+    val ring = remember(grid) { gildOrder(gridNameFor(msgId), grid) }
+
+    val lit = state == WidgetState.SENT ||
+        state == WidgetState.DELIVERED ||
+        state == WidgetState.SEEN
+    val blinkK = if (!animationsOn || !lit) 0 else blinkAmount(blinkPhase)
+    // Closing the eyes only changes hole cells, never the outline, so the ring
+    // above stays valid and does not need recomputing per frame.
+    val drawn = shrinkEyes(grid, eyesFor(gridNameFor(msgId)), blinkK)
 
     Canvas(modifier = modifier) {
-        val cell = minOf(size.width / grid[0].length, size.height / grid.size)
+        val cell = minOf(size.width / drawn[0].length, size.height / drawn.size)
         val goldCount = (ring.size * progress).toInt()
         val gilded = if (state == WidgetState.SEEN) ring.take(goldCount).toHashSet() else emptySet()
 
-        grid.forEachIndexed { r, row ->
+        drawn.forEachIndexed { r, row ->
             row.forEachIndexed { c, ch ->
                 val argb: Int? = when {
                     !isSolid(ch) -> null
 
                     state == WidgetState.SENDING -> {
-                        val filledFrom = grid.size - fillRowsVisible(grid, progress)
-                        if (r >= filledFrom) cellColor(grid, r, c, WidgetState.SENT)
-                        else cellColor(grid, r, c, WidgetState.IDLE)
+                        val filledFrom = drawn.size - fillRowsVisible(drawn, progress)
+                        if (r >= filledFrom) cellColor(drawn, r, c, WidgetState.SENT)
+                        else cellColor(drawn, r, c, WidgetState.IDLE)
                     }
 
                     state == WidgetState.DELIVERED ->
-                        if (rippleReached(grid, r, c, progress)) cellColor(grid, r, c, WidgetState.DELIVERED)
-                        else cellColor(grid, r, c, WidgetState.SENT)
+                        if (rippleReached(drawn, r, c, progress)) cellColor(drawn, r, c, WidgetState.DELIVERED)
+                        else cellColor(drawn, r, c, WidgetState.SENT)
 
                     state == WidgetState.SEEN -> when {
-                        ch == 's' -> PixelPalette.Shine
+                        // The gild wins over the tone now, which is what lets an
+                        // icon light its own shine and shade cells. For icons
+                        // that gild their outline nothing changes: only plain
+                        // solid cells ever reach the ring in that case.
                         (r to c) in gilded -> PixelPalette.Gold
-                        else -> cellColor(grid, r, c, WidgetState.DELIVERED)
+                        ch == 's' -> PixelPalette.Shine
+                        ch == 'd' -> shadeFor(WidgetState.SEEN)
+                        else -> cellColor(drawn, r, c, WidgetState.DELIVERED)
                     }
 
-                    else -> cellColor(grid, r, c, state)
+                    else -> cellColor(drawn, r, c, state)
                 }
 
                 argb?.let {
-                    drawRect(
-                        color = Color(it),
-                        topLeft = Offset(c * cell, r * cell),
-                        size = Size(cell, cell),
-                    )
+                    val (topLeft, size) = cellRect(r, c, cell)
+                    drawRect(color = Color(it), topLeft = topLeft, size = size)
                 }
             }
         }

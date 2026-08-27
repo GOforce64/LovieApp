@@ -32,6 +32,17 @@ IDLE   = "#C98BA8"
 DEEP   = "#FF6FA5"   # delivered: it landed on her phone
 GOLD   = "#FFC64B"   # seen: a ring outside the shape, she actually looked
 
+def shade_of(fill, f=0.72):
+    """The shade tone for a given state's fill.
+
+    Derived rather than pinned to BORDER on purpose: BORDER is lighter than FILL
+    in the sent state and darker than DEEP in the delivered one, so a fixed shade
+    would flip from shadow to highlight halfway up the ladder. Deriving it from
+    the fill keeps a shaded face shaded in every state.
+    """
+    r, g, b = (int(fill[i:i+2], 16) for i in (1, 3, 5))
+    return "#%02X%02X%02X" % (int(r*f), int(g*f), int(b*f))
+
 ICONS_11 = {
 "heart": """
 ...........
@@ -155,16 +166,109 @@ XX..XXXXXXXXX
 """,
 }
 
+# The set the app ships. Sizes differ per icon on purpose: the phone needs room
+# for an earpiece, a screen and a keypad, and the paw is a straight doubling of
+# the 11-grid one rather than a redraw. vector_drawable() fits any grid into the
+# same 22 units, so mixed sizes still line up optically.
+#
+# 'd' is the shade tone — a third value between the border and the fill, which is
+# what lets the phone have a lit face and a shaded side. See shade_of().
+ICONS_APP = {
+"heart": """
+................
+...XXX....XXX...
+..XssXX..XXXXX..
+.XssXXXXXXXXXXX.
+XXsXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXX
+.XXXXXXXXXXXXXX.
+.XXXXXXXXXXXXXX.
+..XXXXXXXXXXXX..
+...XXXXXXXXXX...
+....XXXXXXXX....
+.....XXXXXX.....
+......XXXX......
+.......XX.......
+""",
+"bubble": """
+..XXXXXXXXXXXX..
+.XXXXXXXXXXXXXX.
+XXXXXXXXXXXXXXXX
+XXXXXoXXXXoXXXXX
+XXXXXoXXXXoXXXXX
+XXXXXoXXXXoXXXXX
+XXXXXXXXXXXXXXXX
+XXXXXoXXXXoXXXXX
+XXXXXXooooXXXXXX
+XXXXXXXXXXXXXXXX
+.XXXXXXXXXXXXXX.
+..XXXXXXXXXXXX..
+...XXXXXX.......
+..XXXX..........
+.XXX............
+XX..............
+""",
+"paw": """
+......XXXX..XXXX......
+......XXXX..XXXX......
+XXXX..XXXX..XXXX..XXXX
+XXXX..XXXX..XXXX..XXXX
+XXXX..XXXX..XXXX..XXXX
+XXXX..XXXX..XXXX..XXXX
+XXXX..............XXXX
+XXXX..............XXXX
+......................
+......................
+....XXXXXXXXXXXXXX....
+....XXXXXXXXXXXXXX....
+..XXXXXXXXXXXXXXXXXX..
+..XXXXXXXXXXXXXXXXXX..
+XXXXXXXXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXXXXXXXX
+..XXXXXXXXXXXXXXXXXX..
+..XXXXXXXXXXXXXXXXXX..
+....XXXXXXXXXXXXXX....
+....XXXXXXXXXXXXXX....
+""",
+"call": """
+....................
+.....sssssssssss....
+....XXXXXXXXXXdd....
+....XXXddddXXXdd....
+....XXXXXXXXXXdd....
+....XssssssssXdd....
+....XssssssssXdd....
+....XssssssssXdd....
+....XssssssssXdd....
+....XssssssssXdd....
+....XXXXXXXXXXdd....
+....XddXddXddXdd....
+....XXXXXXXXXXdd....
+....XddXddXddXdd....
+....XXXXXXXXXXdd....
+....XddXddXddXdd....
+....XXXXXXXXXXdd....
+....XddXddXddXdd....
+....XXXXXXXXXXdd....
+....XXXXXXXXXX......
+""",
+}
+
 def parse(g):
     rows = g.strip("\n").split("\n")
     n = len(rows)
     for r in rows:
         assert len(r) == n, f"grid must be square: {n} rows, row width {len(r)}: {r!r}"
-    solid = [[c in "Xs" for c in r] for r in rows]
+    solid = [[c in "Xsd" for c in r] for r in rows]
     holes = [[c == "o" for c in r] for r in rows]
     shine = [[c == "s" for c in r] for r in rows]
-    sil   = [[c in "Xso" for c in r] for r in rows]
-    return solid, sil, holes, shine, n
+    shade = [[c == "d" for c in r] for r in rows]
+    sil   = [[c in "Xsdo" for c in r] for r in rows]
+    return solid, sil, holes, shine, shade, n
 
 def outline(cells, n):
     out = [[False]*n for _ in range(n)]
@@ -182,7 +286,7 @@ def outline(cells, n):
 def union(a, b, n):
     return [[a[y][x] or b[y][x] for x in range(n)] for y in range(n)]
 
-def layers(solid, sil, holes, shine, n):
+def layers(solid, sil, holes, shine, shade, n):
     """Split into border / interior / shine.
 
     A shape only one pixel thick has no interior at all — every cell is a border
@@ -191,12 +295,15 @@ def layers(solid, sil, holes, shine, n):
     instead, with no border.
     """
     border = [[outline(sil, n)[y][x] and solid[y][x] for x in range(n)] for y in range(n)]
-    interior = [[solid[y][x] and not border[y][x] and not shine[y][x]
+    interior = [[solid[y][x] and not border[y][x] and not shine[y][x] and not shade[y][x]
                  for x in range(n)] for y in range(n)]
     if not any(any(r) for r in interior):
         # an empty grid, not [] — every consumer indexes cells[y][x] by position
         return [[False]*n for _ in range(n)], solid, shine
-    border = [[border[y][x] and not shine[y][x] for x in range(n)] for y in range(n)]
+    # A shade cell is painted as shade wherever it lands, rim included: the whole
+    # point is a face that stays darker than the fill.
+    border = [[border[y][x] and not shine[y][x] and not shade[y][x]
+               for x in range(n)] for y in range(n)]
     return border, interior, shine
 
 def path_of(cells, n):
@@ -241,7 +348,7 @@ FILL_MODE = {
     "call": "up",
 }
 
-def seen_layers(solid, sil, holes, shine, n):
+def seen_layers(solid, sil, holes, shine, shade, n):
     """Seen: the border turns gold around a deepened fill.
 
     A shape only one pixel thick has no border layer to gild — layers() paints it
@@ -249,10 +356,10 @@ def seen_layers(solid, sil, holes, shine, n):
     turns gold. Without this, CALL's seen state would be indistinguishable from
     its delivered one.
     """
-    b, i, sh = layers(solid, sil, holes, shine, n)
+    b, i, sh = layers(solid, sil, holes, shine, shade, n)
     if not any(any(r) for r in b):
         return [(i, GOLD), (sh, SHINE)]
-    return [(i, DEEP), (b, GOLD), (sh, SHINE)]
+    return [(i, DEEP), (b, GOLD), (sh, SHINE), (shade, shade_of(DEEP))]
 
 def tile_frame(n):
     """A gold frame around the tile edge — a halo around the whole widget rather
@@ -336,23 +443,23 @@ def build(icons, outdir, title):
         svg.append(f'<text x="{pad}" y="{oy-8}" fill="#8a8090" font-family="monospace" '
                    f'font-size="13">{title} · {variant}</text>')
         for col, (key, grid) in enumerate(icons.items()):
-            solid, sil, holes, shine, n = parse(grid)
+            solid, sil, holes, shine, shade, n = parse(grid)
             ox = pad + col*(span+pad)
             svg.append(f'<rect x="{ox-6}" y="{oy-6}" width="{span+12}" height="{span+12}" '
                        f'rx="10" fill="#1e1b21"/>')
             if variant.startswith("filled"):
-                b, i, sh = layers(solid, sil, holes, shine, n)
-                for cells, colour in ((i, FILL), (b, BORDER), (sh, SHINE)):
+                b, i, sh = layers(solid, sil, holes, shine, shade, n)
+                for cells, colour in ((i, FILL), (b, BORDER), (sh, SHINE), (shade, shade_of(FILL))):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant.startswith("half"):
                 for cells, colour in half(solid, sil, holes, n, FILL_MODE.get(key, "up")):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant == "delivered":
-                b, i, sh = layers(solid, sil, holes, shine, n)
-                for cells, colour in ((i, DEEP), (b, BORDER), (sh, SHINE)):
+                b, i, sh = layers(solid, sil, holes, shine, shade, n)
+                for cells, colour in ((i, DEEP), (b, BORDER), (sh, SHINE), (shade, shade_of(DEEP))):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             elif variant.startswith("seen"):
-                for cells, colour in seen_layers(solid, sil, holes, shine, n):
+                for cells, colour in seen_layers(solid, sil, holes, shine, shade, n):
                     svg.append(svg_tile(cells, n, ox, oy, colour, span))
             else:
                 svg.append(svg_tile(outline(sil, n), n, ox, oy, IDLE, span))
@@ -364,19 +471,19 @@ def build(icons, outdir, title):
     open(os.path.join(outdir, "preview.svg"), "w").write("".join(svg))
 
     for key, grid in icons.items():
-        solid, sil, holes, shine, n = parse(grid)
-        b, i, sh = layers(solid, sil, holes, shine, n)
+        solid, sil, holes, shine, shade, n = parse(grid)
+        b, i, sh = layers(solid, sil, holes, shine, shade, n)
         open(os.path.join(outdir, f"ic_{key}_filled.xml"), "w").write(
-            vector_drawable([(i, FILL), (b, BORDER), (sh, SHINE)], n))
+            vector_drawable([(i, FILL), (b, BORDER), (sh, SHINE), (shade, shade_of(FILL))], n))
         open(os.path.join(outdir, f"ic_{key}_outline.xml"), "w").write(
             vector_drawable([(outline(sil, n), IDLE)], n))
         open(os.path.join(outdir, f"ic_{key}_half.xml"), "w").write(
             vector_drawable(half(solid, sil, holes, n, FILL_MODE.get(key, "up")), n))
-        b, i, sh = layers(solid, sil, holes, shine, n)
+        b, i, sh = layers(solid, sil, holes, shine, shade, n)
         open(os.path.join(outdir, f"ic_{key}_delivered.xml"), "w").write(
-            vector_drawable([(i, DEEP), (b, BORDER), (sh, SHINE)], n))
+            vector_drawable([(i, DEEP), (b, BORDER), (sh, SHINE), (shade, shade_of(DEEP))], n))
         open(os.path.join(outdir, f"ic_{key}_seen.xml"), "w").write(
-            vector_drawable(seen_layers(solid, sil, holes, shine, n), n))
+            vector_drawable(seen_layers(solid, sil, holes, shine, shade, n), n))
     print(f"{title}: {len(icons)*2} drawables + preview.svg -> {outdir}")
 
 KOTLIN_OUT = "app/src/main/java/com/lovebutton/app/widget/PixelGrids.kt"
@@ -412,4 +519,5 @@ if __name__ == "__main__":
     base = sys.argv[1]
     build(ICONS_11, os.path.join(base, "grid-11"), "11x11")
     build(ICONS_13, os.path.join(base, "grid-13"), "13x13")
-    emit_kotlin(ICONS_11)   # the app ships the 11-grid icons
+    build(ICONS_APP, os.path.join(base, "grid-app"), "app set")
+    emit_kotlin(ICONS_APP)   # the app ships this set

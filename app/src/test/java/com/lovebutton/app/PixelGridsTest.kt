@@ -32,7 +32,7 @@ class PixelGridsTest {
             assertEquals("$name is not square", rows.size, rows.first().length)
             rows.forEach { row ->
                 row.forEach { ch ->
-                    assertTrue("$name has unknown cell '$ch'", ch in "Xso.")
+                    assertTrue("$name has unknown cell '$ch'", ch in "Xsdo.")
                 }
             }
         }

@@ -1,6 +1,8 @@
 package com.lovebutton.app
 
 import com.lovebutton.app.ui.borderRingOrder
+import com.lovebutton.app.ui.gildBoxFor
+import com.lovebutton.app.ui.gildOrder
 import com.lovebutton.app.ui.fillRowsVisible
 import com.lovebutton.app.ui.isBorderCell
 import com.lovebutton.app.ui.rippleReached
@@ -100,7 +102,9 @@ class PixelLadderTest {
             val border = buildSet {
                 grid.forEachIndexed { r, row ->
                     row.forEachIndexed { c, ch ->
-                        if ((ch == 'X' || ch == 's') && isBorderCell(grid, r, c)) add(r to c)
+                        // Matches borderRingOrder: only plain solid cells gild,
+                        // because shine and shade keep their own colours in seen.
+                        if (ch == 'X' && isBorderCell(grid, r, c)) add(r to c)
                     }
                 }
             }
@@ -113,6 +117,35 @@ class PixelLadderTest {
             val pieces = disjointPieces(border)
             assertEquals("$name jumped inside one piece of its outline", pieces - 1, jumps)
         }
+    }
+
+    @Test
+    fun `an icon with a gild box lights that box and nothing outside it`() {
+        val grid = PixelGrids.GRIDS.getValue("call")
+        val box = gildBoxFor("call")!!
+        val order = gildOrder("call", grid)
+
+        assertTrue("nothing to gild", order.isNotEmpty())
+        assertEquals("the gild repeated a cell", order.size, order.toSet().size)
+
+        // Only shine and shade cells, and only ones inside the box: the top face
+        // and the side face are the same two tones, so a gild that escaped the
+        // box would turn the phone's whole 3D shading gold.
+        order.forEach { (r, c) ->
+            assertTrue("gilded outside the box", r in box.rows && c in box.cols)
+            assertTrue("gilded a plain cell", grid[r][c] == 's' || grid[r][c] == 'd')
+        }
+
+        val expected = box.rows.flatMap { r ->
+            box.cols.filter { c -> grid[r][c] == 's' || grid[r][c] == 'd' }.map { c -> r to c }
+        }.toSet()
+        assertEquals("the gild missed part of its box", expected, order.toSet())
+    }
+
+    @Test
+    fun `an icon without a gild box still runs its outline`() {
+        val grid = PixelGrids.GRIDS.getValue("heart")
+        assertEquals(borderRingOrder(grid), gildOrder("heart", grid))
     }
 
     /** How many touching groups the border falls into, counted independently. */
