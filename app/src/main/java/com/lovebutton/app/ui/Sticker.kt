@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -58,6 +61,10 @@ fun StickerBox(
  *
  * `enabled` dims the fill rather than the text: a greyed label on a bright
  * sticker reads as a rendering fault, where a muted sticker reads as waiting.
+ *
+ * `height` pins the button instead of letting its padding decide. A caller that
+ * has to budget the screen by hand needs the number it is budgeting to be the
+ * number the button actually takes.
  */
 @Composable
 fun StickerButton(
@@ -67,18 +74,26 @@ fun StickerButton(
     fill: Color = Sticker.Surface,
     enabled: Boolean = true,
     radius: Int = 13,
+    height: Dp? = null,
 ) {
     StickerBox(
         fill = if (enabled) fill else Sticker.Ground,
         radius = radius,
         modifier = if (enabled) modifier.clickable { onClick() } else modifier,
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            textAlign = TextAlign.Center,
-            color = if (enabled) Sticker.Ink else Sticker.Ink.copy(alpha = 0.45f),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp, horizontal = 10.dp),
-        )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .then(if (height != null) Modifier.height(height) else Modifier)
+                .padding(horizontal = 10.dp, vertical = if (height == null) 11.dp else 0.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                color = if (enabled) Sticker.Ink else Sticker.Ink.copy(alpha = 0.45f),
+            )
+        }
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +35,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lovebutton.app.R
 import androidx.lifecycle.Lifecycle
@@ -70,6 +72,20 @@ private fun pandaFor(msgId: Int): Int = when (msgId) {
  * Pinning the height means the four stickers and the footer never move.
  */
 private val FocalHeight = 196.dp
+private val FocalGap = 24.dp
+
+/**
+ * Pinned so the screen can be budgeted. This layout must not scroll and every
+ * part of it has to stay on screen, which is only checkable if the fixed parts
+ * are actually the size they claim.
+ */
+private val FooterHeight = 46.dp
+private val NudgeHeight = 27.dp
+
+/** How far each part may be squeezed before something else has to give. */
+private val MinFocalHeight = 150.dp
+private val MinPandaHeight = 80.dp
+private val MinPandaClearance = 14.dp
 
 /** Reserved for the settled line, so its arrival moves nothing above it. */
 private val SettledLineHeight = 20.dp
@@ -88,6 +104,45 @@ private val PandaOverhang = PandaHeight - MessageButtonHeight
  * which is the panda plus this, does not move at all.
  */
 private val PandaClearance = 30.dp
+
+/** The three heights that flex, once the screen has been measured. */
+private data class HomeFit(val focal: Dp, val panda: Dp, val clearance: Dp)
+
+/**
+ * Sizes that fit the screen this phone actually has.
+ *
+ * A Column measures its children in order, so when the content is taller than
+ * the window the last child gets whatever is left — which was nothing. That is
+ * not a visible overflow, it is a footer with no height: the two buttons were
+ * drawn as empty squashed stickers with their labels clipped away. A phone one
+ * notch shorter, or the same phone with the setup nudge showing, was enough.
+ *
+ * So the screen is measured first and the flexible parts give in order of what
+ * costs least: the air between stickers, then the focal card, then the pandas.
+ * Nothing here can drop below its floor, so a truly tiny screen would still
+ * overflow — but it now takes a far smaller one than any phone this runs on.
+ */
+private fun fitHome(available: Dp, rows: Int, chrome: Dp): HomeFit {
+    var focal = FocalHeight
+    var panda = PandaHeight
+    var clearance = PandaClearance
+
+    fun total() = focal + FocalGap + (panda + clearance) * rows.toFloat() + chrome
+
+    if (total() > available) {
+        val give = minOf((total() - available) / rows.toFloat(), PandaClearance - MinPandaClearance)
+        clearance -= give
+    }
+    if (total() > available) {
+        val give = minOf(total() - available, FocalHeight - MinFocalHeight)
+        focal -= give
+    }
+    if (total() > available) {
+        val give = minOf((total() - available) / rows.toFloat(), PandaHeight - MinPandaHeight)
+        panda -= give
+    }
+    return HomeFit(focal, panda, clearance)
+}
 
 @Composable
 fun HomeScreen(
@@ -118,7 +173,7 @@ fun HomeScreen(
     }
     val ready = remember(setupRefresh, miuiConfirmed) { deliveryReady(context, miuiConfirmed) }
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Sticker.Ground)
@@ -129,144 +184,157 @@ fun HomeScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(20.dp),
     ) {
-        // ---- focal area ----
-        StickerBox(fill = Sticker.Surface, radius = 22, modifier = Modifier.fillMaxWidth()) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(FocalHeight)
-                    .padding(vertical = 12.dp, horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                val state = snapshot?.state ?: WidgetState.IDLE
-                AnimatedPixelIcon(
-                    msgId = snapshot?.msgId ?: 1,
-                    state = state,
-                    modifier = Modifier.size(112.dp),
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    // The guide's words, deliberately: one voice for a state
-                    // wherever it appears, so the guide reads as an explanation
-                    // of this screen rather than a second vocabulary for it.
-                    text = guideLine(state, partnerName),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-                // Only once the send has settled: while it is in flight the
-                // state line already says everything, and two lines competing
-                // makes the moment busy rather than warm. The slot is always
-                // there, occupied or not, so the line's arrival does not nudge
-                // the icon above it.
-                val settled = snapshot?.takeIf { it.state == WidgetState.SEEN }
-                Box(
-                    Modifier.fillMaxWidth().height(SettledLineHeight).padding(top = 4.dp),
-                    contentAlignment = Alignment.Center,
+        val fit = fitHome(
+            available = maxHeight,
+            rows = MESSAGES.size,
+            chrome = FooterHeight + if (ready) 0.dp else NudgeHeight,
+        )
+
+        Column(Modifier.fillMaxSize()) {
+            // ---- focal area ----
+            StickerBox(fill = Sticker.Surface, radius = 22, modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(fit.focal)
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    if (settled != null) {
-                        Text(
-                            text = coldOpenLine(
-                                partnerName,
-                                messageForId(settled.msgId)?.text ?: "",
-                                System.currentTimeMillis() - settled.at,
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            textAlign = TextAlign.Center,
-                        )
+                    val state = snapshot?.state ?: WidgetState.IDLE
+                    AnimatedPixelIcon(
+                        msgId = snapshot?.msgId ?: 1,
+                        state = state,
+                        modifier = Modifier.size(112.dp),
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Text(
+                        // The guide's words, deliberately: one voice for a state
+                        // wherever it appears, so the guide reads as an explanation
+                        // of this screen rather than a second vocabulary for it.
+                        text = guideLine(state, partnerName),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    // Only once the send has settled: while it is in flight the
+                    // state line already says everything, and two lines competing
+                    // makes the moment busy rather than warm. The slot is always
+                    // there, occupied or not, so the line's arrival does not nudge
+                    // the icon above it.
+                    val settled = snapshot?.takeIf { it.state == WidgetState.SEEN }
+                    Box(
+                        Modifier.fillMaxWidth().height(SettledLineHeight).padding(top = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (settled != null) {
+                            Text(
+                                text = coldOpenLine(
+                                    partnerName,
+                                    messageForId(settled.msgId)?.text ?: "",
+                                    System.currentTimeMillis() - settled.at,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // The first panda's head reaches up into this, so it plays the part
-        // PandaClearance plays between the stickers — a little tighter, because
-        // the focal card above is a wall of white rather than another sticker.
-        Spacer(Modifier.size(24.dp))
+            // The first panda's head reaches up into this, so it plays the part the
+            // clearance plays between the stickers.
+            Spacer(Modifier.size(FocalGap))
 
-        // ---- the four messages ----
-        MESSAGES.forEach { message ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // The next panda's head hangs up into this, so what is left
-                    // over is the clearance above it. The four have to read as
-                    // four separate stickers rather than one block.
-                    .padding(bottom = PandaClearance),
-                // The sticker sits at the bottom of the box, so the space the
-                // overhang reserves opens above it, where the head goes.
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                StickerBox(
-                    fill = stickerColorFor(message.id),
+            // ---- the four messages ----
+            MESSAGES.forEach { message ->
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            // Haptic first, before the network call even starts.
-                            // It lands immediately, which is what makes the tap
-                            // feel responsive regardless of how long the request
-                            // takes.
-                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                            SendWorker.enqueue(context, message.id)
-                        },
+                        // The next panda's head hangs up into this, so what is left
+                        // over is the clearance above it. The four have to read as
+                        // four separate stickers rather than one block.
+                        .padding(bottom = fit.clearance),
+                    // The sticker sits at the bottom of the box, so the space the
+                    // overhang reserves opens above it, where the head goes.
+                    contentAlignment = Alignment.BottomCenter,
                 ) {
-                    Row(
-                        Modifier
+                    StickerBox(
+                        fill = stickerColorFor(message.id),
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .height(MessageButtonHeight)
-                            // The start padding is the panda's own width plus
-                            // its margin, so the line begins beside the panda
-                            // rather than underneath it. The art is very nearly
-                            // square, so its height stands in for its width.
-                            .padding(start = PandaHeight + 26.dp, end = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .clickable {
+                                // Haptic first, before the network call even starts.
+                                // It lands immediately, which is what makes the tap
+                                // feel responsive regardless of how long the request
+                                // takes.
+                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                SendWorker.enqueue(context, message.id)
+                            },
                     ) {
-                        Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(MessageButtonHeight)
+                                // The start padding is the panda's own width plus
+                                // its margin, so the line begins beside the panda
+                                // rather than underneath it. The art is very nearly
+                                // square, so its height stands in for its width.
+                                .padding(start = fit.panda + 26.dp, end = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
+                    // Decorative, and deliberately not clickable, so taps fall through
+                    // to the sticker underneath: the body of the panda still sends,
+                    // and only the head poking out above the button is inert.
+                    Image(
+                        painter = painterResource(pandaFor(message.id)),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 12.dp)
+                            .height(fit.panda),
+                    )
                 }
-                // Decorative, and deliberately not clickable, so taps fall through
-                // to the sticker underneath: the body of the panda still sends,
-                // and only the head poking out above the button is inert.
-                Image(
-                    painter = painterResource(pandaFor(message.id)),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 12.dp)
-                        .height(PandaHeight),
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            // Until delivery setup is finished the second button is the loud one:
+            // it changes colour and changes what it says, and a line above it says
+            // why. Colouring the existing button rather than adding a banner keeps
+            // this screen the fixed height it has to be — there is no room for a
+            // block that appears and disappears without shunting something off the
+            // bottom, which is the bug this layout was just fixed for.
+            if (!ready) {
+                Box(
+                    Modifier.fillMaxWidth().height(NudgeHeight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Messages may not arrive until this is finished.",
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                StickerButton(
+                    label = "What the colours mean",
+                    onClick = onOpenGuide,
+                    height = FooterHeight,
+                    modifier = Modifier.weight(1f),
+                )
+                StickerButton(
+                    label = if (ready) "Delivery setup" else "Finish delivery setup",
+                    onClick = onOpenSetup,
+                    fill = if (ready) Sticker.Surface else Sticker.Butter,
+                    height = FooterHeight,
+                    modifier = Modifier.weight(1f),
                 )
             }
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        // Until delivery setup is finished the second button is the loud one:
-        // it changes colour and changes what it says, and a line above it says
-        // why. Colouring the existing button rather than adding a banner keeps
-        // this screen the fixed height it has to be — there is no room for a
-        // block that appears and disappears without shunting something off the
-        // bottom, which is the bug this layout was just fixed for.
-        if (!ready) {
-            Text(
-                "Messages may not arrive until this is finished.",
-                style = MaterialTheme.typography.labelMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
-            )
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            StickerButton(
-                label = "What the colours mean",
-                onClick = onOpenGuide,
-                modifier = Modifier.weight(1f),
-            )
-            StickerButton(
-                label = if (ready) "Delivery setup" else "Finish delivery setup",
-                onClick = onOpenSetup,
-                fill = if (ready) Sticker.Surface else Sticker.Butter,
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 }
