@@ -800,7 +800,9 @@ git config core.hooksPath .githooks
 - [ ] **Step 2: Verify the hook actually blocks**
 
 ```bash
-printf '%s\n' '-----BEGIN PRIVATE KEY-----' > /tmp/leak-probe.txt
+# Assembled from parts on purpose: written out literally, this very file
+# would trip the hook it is testing.
+printf -- '-----%s %s-----\n' BEGIN "PRIVATE KEY" > /tmp/leak-probe.txt
 cp /tmp/leak-probe.txt ./leak-probe.txt
 git add leak-probe.txt
 git commit -m "probe" ; echo "exit: $?"
