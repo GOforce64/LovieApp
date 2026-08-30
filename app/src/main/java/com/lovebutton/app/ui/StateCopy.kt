@@ -10,14 +10,43 @@ import com.lovebutton.app.widget.WidgetState
  * guide read as an explanation of a different screen, so the plain set was
  * dropped and this is what both show. See the design doc, §5.
  */
-fun guideLine(state: WidgetState, partnerName: String): String = when (state) {
+fun guideWords(state: WidgetState, partnerName: String): String = when (state) {
     WidgetState.IDLE -> "click the button!"
-    WidgetState.SENDING -> "on its way to $partnerName 0o0"
-    WidgetState.SENT -> "traveling in the interwebs (• ε •)"
-    WidgetState.DELIVERED -> "it buzzed $partnerName's phone :3"
-    WidgetState.SEEN -> "$partnerName looked at it (>^o^)>"
-    WidgetState.FAILED -> "didn't get through （◞‸◟）"
+    WidgetState.SENDING -> "on its way to $partnerName"
+    WidgetState.SENT -> "traveling in the interwebs"
+    WidgetState.DELIVERED -> "it buzzed $partnerName's phone"
+    WidgetState.SEEN -> "$partnerName looked at it"
+    WidgetState.FAILED -> "didn't get through"
 }
+
+/**
+ * The face at the end of every line, kept separate so the focal area can move it.
+ *
+ * Idle has one where it used to have none. It is the state the screen rests in,
+ * so a face that only appeared once something was in flight would leave the app
+ * perfectly still exactly when a reader is asking themselves whether it works.
+ *
+ * Every state must have one — a blank here is a state that sits frozen, which
+ * `every state has a face to sway` in StateCopyTest exists to catch.
+ */
+fun guideFace(state: WidgetState): String = when (state) {
+    WidgetState.IDLE -> "(・ω・)"
+    WidgetState.SENDING -> "0o0"
+    WidgetState.SENT -> "(• ε •)"
+    WidgetState.DELIVERED -> ":3"
+    WidgetState.SEEN -> "(>^o^)>"
+    WidgetState.FAILED -> "（◞‸◟）"
+}
+
+/**
+ * The whole line, words then face.
+ *
+ * The guide renders this; the focal area renders the two halves separately so it
+ * can animate the face. Both must say the same thing, which
+ * `the line is its words and its face, in that order` pins.
+ */
+fun guideLine(state: WidgetState, partnerName: String): String =
+    "${guideWords(state, partnerName)} ${guideFace(state)}"
 
 /**
  * What the focal area says on a cold open, when nothing was just sent.
