@@ -14,13 +14,12 @@ import com.lovebutton.app.data.CurrentSend
 import com.lovebutton.app.data.LoveButtonApi
 import com.lovebutton.app.data.PENDING_WINDOW_MS
 import com.lovebutton.app.data.PendingSends
+import com.lovebutton.app.data.windowClosed
 import com.lovebutton.app.data.Prefs
 import com.lovebutton.app.widget.WidgetState
-import com.lovebutton.app.widget.clearWidgetStateIf
 import com.lovebutton.app.widget.holdMillis
 import com.lovebutton.app.widget.setWidgetState
 import kotlinx.coroutines.delay
-import java.util.UUID
 
 /**
  * Performs one send.
@@ -50,19 +49,28 @@ class SendWorker(
         val pending = PendingSends(applicationContext)
         pending.forgetExpired()
 
-        // Minted and recorded BEFORE the request. A receipt can beat the send
-        // response, and a mapping written afterwards would miss it.
-        val sendId = UUID.randomUUID().toString()
+        // Both minted at the tap, by beginSend. The id has to outlive a retry —
+        // a fresh one per attempt would reset the record's clock — and the
+        // timestamp has to be when the user actually pressed it, not when the
+        // connection finally showed up.
+        val sendId = inputData.getString(KEY_SEND_ID) ?: return Result.failure()
+        val tappedAt = inputData.getLong(KEY_TAPPED_AT, 0L)
         mintedSendId = sendId
+
+        // The window closed while this was queued behind a connection that took
+        // too long. The screen gave up on this send twenty seconds ago and went
+        // grey, so sending it now would buzz her phone for something the sender
+        // has already been told did not happen. Abandoned, not retried: a tap is
+        // only worth honouring while the person who made it is still expecting it.
+        if (windowClosed(tappedAt)) return Result.success()
+
+        // Recorded BEFORE the request. A receipt can beat the send response, and
+        // a mapping written afterwards would miss it.
         if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             pending.remember(sendId, appWidgetId)
         }
 
-        // Written for EVERY send, widget or app. Spec §4.2: tapping a widget and
-        // then opening the app shows that send laddering, and this is what makes
-        // it free rather than a second code path.
         val currentSend = CurrentSend(applicationContext)
-        currentSend.start(sendId, msgId)
 
         return try {
             LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId, sendId)
@@ -87,13 +95,15 @@ class SendWorker(
      * waiting for a receipt, and dropping to idle sooner would hide a delivered
      * that was about to arrive.
      *
-     * The clear is guarded on the tile still SHOWING sent, not on the pending
-     * entry still being live. Those look interchangeable and are not: the entry
-     * is written before the request and `widgetFor` expires it at exactly
-     * PENDING_WINDOW_MS, so after waiting that same window the lookup could
-     * never return anything but null and the tile was never returned to idle.
-     * Asking the tile what it is displaying has no such expiry, and still
-     * protects the crimson or gold a receipt may have painted in the meantime.
+     * What happens to the tile at the *end* of that window is no longer decided
+     * here — [TimeoutWorker] owns it, and greys the tile out rather than
+     * returning it to idle. This waits the window out only to forget the pending
+     * entry afterwards. The guard that used to live here, asking the tile what it
+     * is displaying rather than whether the pending entry is still live, moved
+     * with the decision: the entry is written before the request and `widgetFor`
+     * expires it at exactly PENDING_WINDOW_MS, so after waiting that same window
+     * a lookup could never answer anything but "gone", and a guard built on it
+     * would never fire.
      */
     private suspend fun settle(appWidgetId: Int, state: WidgetState, result: Result): Result {
         setWidgetState(applicationContext, appWidgetId, state)
@@ -101,7 +111,13 @@ class SendWorker(
         if (state == WidgetState.SENT) {
             delay(PENDING_WINDOW_MS)
             PendingSends(applicationContext).forget(mintedSendId)
-            clearWidgetStateIf(applicationContext, appWidgetId, WidgetState.SENT)
+            // The tile is deliberately NOT cleared here any more. TimeoutWorker
+            // fires at this same moment and owns what a tile does when its window
+            // closes — and the two disagree: this used to return it to idle,
+            // where a send nothing ever acknowledged must now go grey. Two
+            // writers racing on one tile at the same millisecond is a coin toss,
+            // so there is one writer. A receipt that landed in the meantime makes
+            // both of them a no-op regardless.
             return result
         }
 
@@ -115,14 +131,21 @@ class SendWorker(
     companion object {
         private const val KEY_MSG_ID = "msg_id"
         private const val KEY_APP_WIDGET_ID = "app_widget_id"
+        private const val KEY_SEND_ID = "send_id"
+        private const val KEY_TAPPED_AT = "tapped_at"
 
         /**
+         * Not called directly from a tap — go through [beginSend], which mints
+         * the id and the timestamp this needs and writes the record they belong to.
+         *
          * @param appWidgetId the tile to report back to, or INVALID_APPWIDGET_ID
          *   when the send came from the app's own home screen rather than a widget.
          */
         fun enqueue(
             context: Context,
             msgId: Int,
+            sendId: String,
+            tappedAt: Long,
             appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID,
         ) {
             val request = OneTimeWorkRequestBuilder<SendWorker>()
@@ -130,6 +153,8 @@ class SendWorker(
                     Data.Builder()
                         .putInt(KEY_MSG_ID, msgId)
                         .putInt(KEY_APP_WIDGET_ID, appWidgetId)
+                        .putString(KEY_SEND_ID, sendId)
+                        .putLong(KEY_TAPPED_AT, tappedAt)
                         .build()
                 )
                 .setConstraints(

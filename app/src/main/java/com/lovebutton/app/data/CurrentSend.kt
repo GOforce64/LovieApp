@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.lovebutton.app.widget.WidgetState
 import com.lovebutton.app.widget.advancesTo
 import com.lovebutton.app.widget.fromName
+import com.lovebutton.app.widget.isAwaitingOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -25,6 +26,28 @@ data class SendSnapshot(
     val state: WidgetState,
     val at: Long,
 )
+
+/**
+ * What the screen should show, which is not always what was stored.
+ *
+ * A send can hang in two ways, and both used to read as success. This phone
+ * never got online, so the request was still queued behind a connection that had
+ * not arrived — the record sat on SENDING. Or her phone never came online to
+ * acknowledge it — the record sat on SENT. Either way the focal area said
+ * "traveling in the interwebs" indefinitely, on this open and every one after.
+ *
+ * Derived on read rather than written by a timer at the twenty-second mark, for
+ * two reasons. MIUI kills this process as a matter of routine, so a write that
+ * has to survive twenty seconds often will not happen at all — the same trap
+ * spec §7.1 describes for the tile's own guard. And deriving it fixes the cold
+ * open for free: a send from an hour ago that nothing ever came back for is grey
+ * the moment the screen is opened, rather than still hopeful.
+ *
+ * Once grey it stays grey. The next tap replaces the record outright, which is
+ * the only thing that starts a new story.
+ */
+fun SendSnapshot.displayState(now: Long = System.currentTimeMillis()): WidgetState =
+    if (state.isAwaitingOutcome && windowClosed(at, now)) WidgetState.FAILED else state
 
 /**
  * The single most recent send, whatever started it.

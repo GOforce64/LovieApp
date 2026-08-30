@@ -23,10 +23,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,11 +43,16 @@ import com.lovebutton.app.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.lovebutton.app.data.CurrentSend
+import com.lovebutton.app.data.PENDING_WINDOW_MS
+import com.lovebutton.app.data.displayState
 import com.lovebutton.app.data.DeliverySetup
 import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.data.messageForId
 import com.lovebutton.app.widget.WidgetState
-import com.lovebutton.app.work.SendWorker
+import com.lovebutton.app.widget.isAwaitingOutcome
+import com.lovebutton.app.work.beginSend
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private fun pandaFor(msgId: Int): Int = when (msgId) {
     2 -> R.drawable.panda_thinking
@@ -152,8 +159,22 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val scope = rememberCoroutineScope()
     val store = remember { CurrentSend(context) }
     val snapshot by store.flow.collectAsState(initial = null)
+
+    // The stored state does not change when a send times out — the timeout is
+    // derived on read (see displayState). So while the screen is open, nothing
+    // would prompt a redraw at the twenty-second mark and the focal area would
+    // keep saying "traveling in the interwebs" until the next unrelated event.
+    // This sleeps exactly as far as the deadline and then recomposes once.
+    var timeoutTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(snapshot?.sendId, snapshot?.state) {
+        val waiting = snapshot?.takeIf { it.state.isAwaitingOutcome } ?: return@LaunchedEffect
+        val remaining = PENDING_WINDOW_MS - (System.currentTimeMillis() - waiting.at)
+        if (remaining > 0) delay(remaining)
+        timeoutTick++
+    }
 
     // `true` until DataStore answers, so an enrolled phone that is already set
     // up does not flash the nudge on every launch.
@@ -201,7 +222,13 @@ fun HomeScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    val state = snapshot?.state ?: WidgetState.IDLE
+                    // Read through displayState, so a send nothing ever came back
+                    // for reads grey rather than hopeful — including on a cold
+                    // open hours later. timeoutTick is what re-reads it at the
+                    // deadline while the screen is already open.
+                    val state = remember(snapshot, timeoutTick) {
+                        snapshot?.displayState() ?: WidgetState.IDLE
+                    }
                     AnimatedPixelIcon(
                         msgId = snapshot?.msgId ?: 1,
                         state = state,
@@ -270,7 +297,11 @@ fun HomeScreen(
                                 // feel responsive regardless of how long the request
                                 // takes.
                                 view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                SendWorker.enqueue(context, message.id)
+                                // The record is written here rather than inside the
+                                // worker, which is held back until this phone has a
+                                // connection. Without it a tap made with no signal
+                                // produced nothing on screen at all.
+                                scope.launch { beginSend(context, message.id) }
                             },
                     ) {
                         Row(

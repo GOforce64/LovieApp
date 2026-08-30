@@ -7,7 +7,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.action.ActionCallback
-import com.lovebutton.app.work.SendWorker
+import com.lovebutton.app.work.beginSend
 
 class LoveWidget : MessageWidget(msgId = 1)
 
@@ -32,6 +32,6 @@ class SendAction : ActionCallback {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
 
         setWidgetState(context, appWidgetId, WidgetState.SENDING)
-        SendWorker.enqueue(context, msgId, appWidgetId)
+        beginSend(context, msgId, appWidgetId)
     }
 }
