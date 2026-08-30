@@ -5,21 +5,20 @@ account key and is the only place that decides who may send what to whom.
 
 ## Status
 
-The Worker is complete and tested locally (54 tests passing), but has not been deployed yet.
-Outstanding:
-- **Task 0** must be completed by the human: create Firebase project, generate service account key, create D1 database, create KV namespace
-- **First deploy**: Steps 1–9 must be completed (set secrets, deploy, verify against a real Android phone)
+**Deployed and in daily use** at `https://love-button.<subdomain>.workers.dev`,
+serving two real phones. 75 tests passing.
+
+The Firebase project, the D1 database and the KV namespace all exist; their ids
+are in `wrangler.toml` (ids are identifiers, not credentials, and are safe to
+commit). All three secrets are set. The retention cron runs nightly at 03:17 UTC.
 
 ## Setup
 
     npm install
 
-Before running migrations, the D1 database must be created in Task 0. Once created:
+Migrations have been applied to the remote database. To apply a new one:
 
     npm run migrate:remote
-
-Note: `npm run migrate:remote` has not yet been run — the schema exists and is tested locally,
-but does not yet exist on Cloudflare. It must be run once the D1 database is created, before the first deploy.
 
 Secrets (never in this repo):
 
