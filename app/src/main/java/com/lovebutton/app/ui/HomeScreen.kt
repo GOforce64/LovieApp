@@ -282,7 +282,7 @@ fun HomeScreen(
                                 .padding(start = fit.panda + 26.dp, end = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                            Text(message.text, style = StickerLabel)
                         }
                     }
                     // Decorative, and deliberately not clickable, so taps fall through

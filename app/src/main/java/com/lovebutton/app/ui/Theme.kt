@@ -45,13 +45,28 @@ fun stickerColorFor(msgId: Int): Color = when (msgId) {
     else -> Sticker.Surface
 }
 
-private val Fredoka = FontFamily(Font(R.font.fredoka_semibold, FontWeight.SemiBold))
-private val Quicksand = FontFamily(
+internal val Fredoka = FontFamily(Font(R.font.fredoka_semibold, FontWeight.SemiBold))
+internal val Quicksand = FontFamily(
     Font(R.font.quicksand_medium, FontWeight.Medium),
     Font(R.font.quicksand_bold, FontWeight.Bold),
 )
 
-private val StickerType = Typography(
+/**
+ * The four message buttons, and only those.
+ *
+ * A role of its own rather than a change to `bodyLarge`, which is what Material
+ * hands to any Text that names no style — including the enrolment code field.
+ * Repainting that role would have moved four labels and one text field, and only
+ * the four were meant to move.
+ *
+ * Fredoka rather than Quicksand because the buttons are the loudest thing on the
+ * screen after the pandas, and the body voice was making them read as a settings
+ * list. One point smaller than the display role below it, so the focal line stays
+ * the largest text on the screen.
+ */
+val StickerLabel = TextStyle(fontFamily = Fredoka, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+
+internal val StickerType = Typography(
     headlineMedium = TextStyle(fontFamily = Fredoka, fontSize = 26.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = TextStyle(fontFamily = Fredoka, fontSize = 19.sp, fontWeight = FontWeight.SemiBold),
     bodyLarge = TextStyle(fontFamily = Quicksand, fontSize = 16.sp, fontWeight = FontWeight.Medium),
