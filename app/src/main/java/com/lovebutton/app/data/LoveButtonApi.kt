@@ -109,7 +109,7 @@ class LoveButtonApi(
             }
 
             val parsed = json.decodeFromString<SendResponse>(text)
-            return SendResult(parsed.sendId, parsed.delivered)
+            return SendResult(parsed.sendId, parsed.delivered, parsed.sentAt)
         }
     }
 

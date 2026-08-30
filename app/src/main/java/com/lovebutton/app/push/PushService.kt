@@ -40,11 +40,22 @@ class PushService : FirebaseMessagingService() {
                 val msgId = data["msg_id"]?.toIntOrNull() ?: return
                 val fromName = data["from_name"] ?: "Someone"
                 val sendId = data["send_id"]
+                // Seconds on the wire, milliseconds everywhere in the app.
+                val sentAt = data["sent_at"]?.toLongOrNull()
                 postMessageNotification(applicationContext, msgId, fromName)
                 // After posting, not before: the receipt says "it arrived and she
                 // can see it", and a receipt for a notification that failed to
                 // post would be a lie.
                 if (sendId != null) {
+                    // The bubble is shared, so what she sent becomes what both
+                    // phones show — if the server's clock says it is the newest.
+                    // Without a server timestamp there is nothing to order by,
+                    // and the bubble is left alone rather than guessed at.
+                    if (sentAt != null) {
+                        CoroutineScope(Dispatchers.Default).launch {
+                            CurrentSend(applicationContext).receive(sendId, msgId, sentAt * 1000L)
+                        }
+                    }
                     ReceiptWorker.enqueue(applicationContext, sendId, "delivered")
                     reportOrRememberSeen(sendId)
                 }

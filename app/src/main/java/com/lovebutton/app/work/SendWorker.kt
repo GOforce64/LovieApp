@@ -73,8 +73,12 @@ class SendWorker(
         val currentSend = CurrentSend(applicationContext)
 
         return try {
-            LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId, sendId)
+            val result = LoveButtonApi(BuildConfig.API_BASE_URL).send(enrolment.authToken, msgId, sendId)
             currentSend.update(sendId, WidgetState.SENT)
+            // The server's clock, which is what both phones order the shared
+            // bubble by. Zero means this Worker predates the field; the record
+            // then has no place in the ordering and anything arriving wins.
+            if (result.sentAt > 0L) currentSend.markSentAt(sendId, result.sentAt * 1000L)
             // A delivered count of zero still counts as success: the send was
             // recorded, her phone just has no active device right now.
             settle(appWidgetId, WidgetState.SENT, Result.success())
