@@ -72,10 +72,11 @@ fun swayOffsetPx(phase: Float, amplitudePx: Float, animationsOn: Boolean): Float
 fun SwayingStateLine(
     state: WidgetState,
     partnerName: String,
+    fromMe: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val style = MaterialTheme.typography.titleMedium
-    val face = guideFace(state)
+    val face = guideFace(state, fromMe)
     val context = LocalContext.current
     val density = LocalDensity.current
 
@@ -111,7 +112,7 @@ fun SwayingStateLine(
     val amplitudePx = with(density) { SwayAmplitude.toPx() }
 
     val line = buildAnnotatedString {
-        append(guideWords(state, partnerName))
+        append(guideWords(state, partnerName, fromMe))
         append(' ')
         appendInlineContent(FaceTag, face)
     }

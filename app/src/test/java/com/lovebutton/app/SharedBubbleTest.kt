@@ -2,7 +2,11 @@ package com.lovebutton.app
 
 import com.lovebutton.app.data.SendSnapshot
 import com.lovebutton.app.data.receivedWins
+import com.lovebutton.app.ui.guideFace
+import com.lovebutton.app.ui.guideWords
+import com.lovebutton.app.ui.receivedLine
 import com.lovebutton.app.widget.WidgetState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,5 +62,37 @@ class SharedBubbleTest {
         // still runs its own full ladder regardless.
         assertTrue(receivedWins(mine(serverAt = null, state = WidgetState.SENDING), 1L))
         assertTrue(receivedWins(mine(serverAt = null, state = WidgetState.SENT), 1L))
+    }
+
+    @Test
+    fun `a message she sent names her, in every state`() {
+        // The stored state of a received message is SEEN, but the copy must not
+        // lean on that: it branches on who sent it, so a state that somehow
+        // reached a received record could never produce "Wifey looked at it" on
+        // Wifey's own phone.
+        WidgetState.entries.forEach { state ->
+            assertEquals("Wifey sent you this", guideWords(state, "Wifey", fromMe = false))
+            assertTrue("$state has no face", guideFace(state, fromMe = false).isNotBlank())
+        }
+    }
+
+    @Test
+    fun `my own lines are untouched`() {
+        WidgetState.entries.forEach { state ->
+            assertEquals(guideWords(state, "Wifey"), guideWords(state, "Wifey", fromMe = true))
+            assertEquals(guideFace(state), guideFace(state, fromMe = true))
+        }
+    }
+
+    @Test
+    fun `the line under a received message names the message, not the reader`() {
+        // "Wifey saw your Miss you" is what the sending side says. On the side
+        // that received it the only useful facts are what it was and how long
+        // ago — telling her she saw it would be reporting her own action back
+        // to her.
+        val line = receivedLine("Miss you", 5 * 60_000L)
+        assertTrue(line, line.contains("Miss you"))
+        assertTrue(line, line.contains("5m"))
+        assertFalse(line, line.contains("saw"))
     }
 }

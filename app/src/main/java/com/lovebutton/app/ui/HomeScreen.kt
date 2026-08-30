@@ -244,6 +244,7 @@ fun HomeScreen(
                         // nothing at all is happening.
                         state = state,
                         partnerName = partnerName,
+                        fromMe = snapshot?.fromMe ?: true,
                     )
                     // Only once the send has settled: while it is in flight the
                     // state line already says everything, and two lines competing
@@ -257,11 +258,22 @@ fun HomeScreen(
                     ) {
                         if (settled != null) {
                             Text(
-                                text = coldOpenLine(
-                                    partnerName,
-                                    messageForId(settled.msgId)?.text ?: "",
-                                    System.currentTimeMillis() - settled.at,
-                                ),
+                                // Whose message it was decides which line this
+                                // is: the sender learns that she saw it, and she
+                                // learns what arrived and when. Telling her she
+                                // saw it would report her own action back to her.
+                                text = if (settled.fromMe) {
+                                    coldOpenLine(
+                                        partnerName,
+                                        messageForId(settled.msgId)?.text ?: "",
+                                        System.currentTimeMillis() - settled.at,
+                                    )
+                                } else {
+                                    receivedLine(
+                                        messageForId(settled.msgId)?.text ?: "",
+                                        System.currentTimeMillis() - settled.at,
+                                    )
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 textAlign = TextAlign.Center,
                             )
