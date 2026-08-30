@@ -21,6 +21,21 @@ val apiBaseUrl: String = Properties().run {
     )
 }
 
+/**
+ * Release signing, read from a file that is never committed.
+ *
+ * Absent on any machine that only builds debug, and that must not fail the
+ * build — so the config is registered only when the file is actually there, and
+ * `assembleRelease` is the only task that needs it.
+ *
+ * Losing this keystore means the app can never be updated in place on her phone
+ * again: Android refuses an install whose signature changed, so the only way
+ * forward would be an uninstall and a re-enrol. Back it up (spec §4.1).
+ */
+val keystoreProps: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.exists() }
+    ?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -37,15 +52,29 @@ android {
         applicationId = "com.lovebutton.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        // 2 rather than 1: builds carrying code 1 are already installed on
+        // both phones, and Android refuses an install over an equal code.
+        versionCode = 2
+        versionName = "1.0"
 
         // Supplied via local.properties; see the apiBaseUrl block above.
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
+    signingConfigs {
+        keystoreProps?.let { props ->
+            create("release") {
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            keystoreProps?.let { signingConfig = signingConfigs.getByName("release") }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

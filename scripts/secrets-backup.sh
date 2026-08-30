@@ -37,6 +37,23 @@ fi
 # local.properties is deliberately NOT backed up: it is an absolute path to this
 # machine's Android SDK and is actively wrong on any other machine.
 
+# The release keystore is the one secret here that cannot be regenerated. Every
+# other value in this bundle can be reissued from its source — a new service
+# account key, new enrolment codes, a fresh google-services.json. This one
+# cannot: Android refuses an install whose signature changed, so losing it means
+# the app on her phone can never be updated again, only uninstalled and
+# re-enrolled. It is backed up first for that reason (spec §4.1).
+for f in love-button-release.jks keystore.properties; do
+    if [ -f "$REPO_ROOT/$f" ]; then
+        cp "$REPO_ROOT/$f" "$STAGE/$f"
+        echo "  [copied]  $f"
+        copied=$((copied + 1))
+    else
+        echo "  [MISSING] $f — the release signing key. Without it this bundle"
+        echo "            cannot rebuild an installable update."
+    fi
+done
+
 # --- 2. Worker secrets, which Cloudflare will not hand back ----------------
 # Reuse the values from a previous backup if one is sitting next to the output,
 # so re-running this does not mean re-pasting a service-account key every time.
@@ -110,7 +127,10 @@ cp "$REPO_ROOT/docs/SECRETS.md" "$STAGE/SECRETS.md" 2>/dev/null || true
 # `tar -xzf bundle worker-secrets.env` fails with "Not found in archive" —
 # which is precisely the command this script tells you to run.
 MEMBERS=()
-for f in SECRETS.md worker-secrets.env google-services.json device-tokens.env; do
+# Explicit list rather than the whole staging dir, so a stray file cannot be
+# swept in. Anything added to the staging step above must be named here too.
+for f in SECRETS.md worker-secrets.env google-services.json device-tokens.env \
+         love-button-release.jks keystore.properties; do
     [ -f "$STAGE/$f" ] && MEMBERS+=("$f")
 done
 tar -czf "$OUT" -C "$STAGE" "${MEMBERS[@]}"
