@@ -258,7 +258,7 @@ All responses are JSON. All errors are `{ "error": "code", "message": "..." }`.
 | Method | Path | Auth | Body | Returns |
 |---|---|---|---|---|
 | GET | `/health` | none | — | `{ok: true}` |
-| POST | `/v1/enroll` | code | `{code, fcm_token, label}` | `{device_id, auth_token, person, partner_name}` |
+| POST | `/v1/enroll` | code | `{code, fcm_token?, label}` | `{device_id, auth_token, person, partner_name}` |
 | POST | `/v1/devices` | bearer | `{fcm_token}` | `{ok: true}` |
 | DELETE | `/v1/devices` | bearer | — | `{ok: true}` |
 | POST | `/v1/send` | bearer | `{msg_id}` | `{send_id, delivered: n}` |
@@ -269,6 +269,19 @@ All responses are JSON. All errors are `{ "error": "code", "message": "..." }`.
 Rate-limited to 5 attempts per hour per IP. Compares the supplied code against both
 secrets in constant time. On success: generate a 256-bit token, insert a `devices`
 row storing its SHA-256, return the token **once** — it is never retrievable again.
+
+**`fcm_token` is optional.** Omitting it enrols a *send-only* device: it holds a
+working bearer token but a NULL `fcm_token`, so `/v1/send`'s fan-out — which
+already selects `WHERE fcm_token IS NOT NULL` — skips it entirely. It can send as
+its person and can never receive, nor take a push from a real phone.
+
+This exists for the overnight gate (§10). That check sends as each person from a
+laptop, and used to read each phone's own bearer token off the handset with
+`run-as`. A release APK is not debuggable, so that stopped working at 1.0 — and it
+should: the alternative is a publicly downloadable build whose private data any
+adb session can read. A send-only device replaces it and grants no new authority,
+since the enrolment code is still required and the recipient is still derived
+server-side. Such rows are invisible from the phones, so label them.
 
 #### `/v1/devices`
 

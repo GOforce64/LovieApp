@@ -68,6 +68,59 @@ describe("POST /v1/enroll", () => {
     expect(row?.auth_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("enrols a send-only device when no FCM token is given", async () => {
+    // The overnight gate needs to send AS each person without touching either
+    // handset. A release APK is not debuggable, so its bearer token can no
+    // longer be read off the phone — this is where that token comes from now.
+    const res = await enroll({
+      code: "test-code-one",
+      label: "overnight-check · laptop",
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ auth_token: string; person: number }>();
+    expect(body.person).toBe(1);
+    expect(body.auth_token).toHaveLength(64);
+
+    const row = await env.DB.prepare(
+      "SELECT fcm_token, label FROM devices WHERE person = 1",
+    ).first<{ fcm_token: string | null; label: string }>();
+
+    // NULL, not a placeholder string: /v1/send fans out to
+    // `WHERE fcm_token IS NOT NULL`, so this row is skipped by the query that
+    // already exists rather than by a new special case.
+    expect(row?.fcm_token).toBeNull();
+    expect(row?.label).toBe("overnight-check · laptop");
+  });
+
+  it("an explicit null FCM token is send-only too", async () => {
+    const res = await enroll({ code: "test-code-one", fcm_token: null });
+    expect(res.status).toBe(200);
+
+    const row = await env.DB.prepare("SELECT fcm_token FROM devices").first<{
+      fcm_token: string | null;
+    }>();
+    expect(row?.fcm_token).toBeNull();
+  });
+
+  it("rejects an FCM token that is neither a string nor absent", async () => {
+    const res = await enroll({ code: "test-code-one", fcm_token: 42 });
+    expect(res.status).toBe(400);
+  });
+
+  it("send-only rows never dedupe each other away", async () => {
+    // The dedupe deletes rows sharing an FCM token. Two send-only rows both
+    // hold NULL, and `= NULL` is never true in SQL — so this is already safe,
+    // but it is the kind of safety that must not regress silently.
+    await enroll({ code: "test-code-one", label: "laptop" });
+    await enroll({ code: "test-code-two", label: "laptop" });
+
+    const rows = await env.DB.prepare("SELECT person FROM devices ORDER BY person").all<{
+      person: number;
+    }>();
+    expect(rows.results.map((r) => r.person)).toEqual([1, 2]);
+  });
+
   it("rejects a wrong code with 403", async () => {
     const res = await enroll({ code: "not-the-code", fcm_token: "fcm-1" });
 

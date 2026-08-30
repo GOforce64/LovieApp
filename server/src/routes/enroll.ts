@@ -42,9 +42,28 @@ enroll.post("/enroll", async (c) => {
   }
 
   const body = await readJson<EnrollBody>(c);
-  if (!body || typeof body.code !== "string" || typeof body.fcm_token !== "string") {
-    return fail(c, 400, "bad_request", "code and fcm_token are required.");
+  if (!body || typeof body.code !== "string") {
+    return fail(c, 400, "bad_request", "code is required.");
   }
+
+  // A device may enrol WITHOUT an FCM token, which makes it send-only: it gets a
+  // working bearer token but never receives a push, because /v1/send fans out to
+  // `WHERE fcm_token IS NOT NULL` and this row simply is not in that set.
+  //
+  // That is what the overnight gate runs on. A release APK is not debuggable, so
+  // a phone's own bearer token can no longer be read off it with `run-as`, and
+  // the alternative — shipping a debuggable release so the check keeps working —
+  // would let any adb session read the app's private data on a publicly
+  // downloadable build.
+  //
+  // No new authority is granted: the enrolment code is still required, the
+  // sender is still the authenticated device, and the recipient is still derived
+  // as 3 - from_person. Such a row is invisible from the phones, so label it.
+  const hasToken = typeof body.fcm_token === "string";
+  if (body.fcm_token !== undefined && body.fcm_token !== null && !hasToken) {
+    return fail(c, 400, "bad_request", "fcm_token must be a string when given.");
+  }
+  const fcmToken = hasToken ? (body.fcm_token as string) : null;
 
   const person = await personForCode(c.env, body.code);
   if (person === null) {
@@ -61,11 +80,13 @@ enroll.post("/enroll", async (c) => {
   // same token is the same physical device re-enrolling. Drop the old row
   // rather than accumulating dead ones that would double every push.
   await c.env.DB.batch([
-    c.env.DB.prepare("DELETE FROM devices WHERE fcm_token = ?").bind(body.fcm_token),
+    // `= NULL` is never true in SQL, so one send-only row cannot dedupe another
+    // away. That is the behaviour we want, and it needs no special case.
+    c.env.DB.prepare("DELETE FROM devices WHERE fcm_token = ?").bind(fcmToken),
     c.env.DB.prepare(
       `INSERT INTO devices (id, person, auth_hash, fcm_token, label, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(deviceId, person, authHash, body.fcm_token, label, now, now),
+    ).bind(deviceId, person, authHash, fcmToken, label, now, now),
   ]);
 
   // The raw token is returned exactly once and is never recoverable again.
