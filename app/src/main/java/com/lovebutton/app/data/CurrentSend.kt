@@ -169,17 +169,41 @@ class CurrentSend(private val context: Context) {
     }
 
     /**
-     * Records the server's timestamp for a send of ours, once the response
-     * carries it.
+     * Records the server's timestamp for a send of ours, and reclaims the bubble
+     * if an older message took it while we were still in flight.
      *
-     * Until this lands the record has no place in the ordering at all, and
-     * anything arriving takes the bubble — which is the agreed behaviour, not a
-     * gap. Guarded on the id like [update], because a later send may already
-     * have replaced the record by the time a slow response comes back.
+     * The reclaim is not a nicety, it is what makes the two bubbles agree. Until
+     * this lands our send has no server timestamp, so an arriving message has
+     * nothing to be compared against and takes the bubble unconditionally — even
+     * one the server stamped EARLIER than ours. Her phone, whose own send did
+     * have a timestamp by then, correctly keeps the newer one. Without the
+     * reclaim the two phones settle on different messages, which is the single
+     * outcome the shared bubble exists to prevent. Observed on hardware before it
+     * was written: a tap one second newer than her message lost the bubble to it.
+     *
+     * Only ever takes it back from something genuinely older. A message that is
+     * really newer keeps it, which is the agreed rule that the newest message
+     * wins even mid-ladder.
      */
-    suspend fun markSentAt(sendId: String, serverAt: Long) {
+    suspend fun markSentAt(sendId: String, msgId: Int, tappedAt: Long, serverAt: Long) {
         context.currentSendStore.edit { prefs ->
-            if (prefs[Keys.SEND_ID] != sendId) return@edit
+            if (prefs[Keys.SEND_ID] == sendId) {
+                prefs[Keys.SERVER_AT] = serverAt
+                return@edit
+            }
+
+            // Something replaced us. Take it back only if it is older than we
+            // are, and only if it is hers — a newer send of our own replaced
+            // this one deliberately and must not be undone.
+            val theirs = prefs[Keys.FROM_ME] == false
+            val theirServerAt = prefs[Keys.SERVER_AT] ?: return@edit
+            if (!theirs || theirServerAt >= serverAt) return@edit
+
+            prefs[Keys.SEND_ID] = sendId
+            prefs[Keys.MSG_ID] = msgId
+            prefs[Keys.STATE] = WidgetState.SENT.name
+            prefs[Keys.AT] = tappedAt
+            prefs[Keys.FROM_ME] = true
             prefs[Keys.SERVER_AT] = serverAt
         }
     }
