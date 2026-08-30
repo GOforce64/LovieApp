@@ -208,13 +208,15 @@ fun HomeScreen(
                         modifier = Modifier.size(112.dp),
                     )
                     Spacer(Modifier.size(10.dp))
-                    Text(
+                    SwayingStateLine(
                         // The guide's words, deliberately: one voice for a state
                         // wherever it appears, so the guide reads as an explanation
                         // of this screen rather than a second vocabulary for it.
-                        text = guideLine(state, partnerName),
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
+                        // Here the face at the end of the line drifts, which is the
+                        // one thing that tells a reader the app is awake while
+                        // nothing at all is happening.
+                        state = state,
+                        partnerName = partnerName,
                     )
                     // Only once the send has settled: while it is in flight the
                     // state line already says everything, and two lines competing
