@@ -1,6 +1,7 @@
 package com.lovebutton.app.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -19,13 +20,39 @@ import kotlinx.coroutines.flow.map
 // survives from one test method into the next.
 internal val Context.currentSendStore by preferencesDataStore(name = "current_send")
 
-/** One send, as the app screen needs to see it. */
+/** One message, as the app screen needs to see it — sent by either of you. */
 data class SendSnapshot(
     val sendId: String,
     val msgId: Int,
     val state: WidgetState,
+    /** This phone's clock, at the tap. Feeds the timeout, never the ordering. */
     val at: Long,
+    /** False when the other phone sent it. */
+    val fromMe: Boolean = true,
+    /** The server's clock. Null only while a send of your own is in flight. */
+    val serverAt: Long? = null,
 )
+
+/**
+ * Whether an arriving message takes the bubble from whatever is already there.
+ *
+ * The bubble is shared, so both phones have to reach the same answer from the
+ * same facts — which means the server's clock decides it, and only ever against
+ * another server clock. Comparing it to this phone's own `at` would be two
+ * clocks pretending to be one, and the two bubbles would disagree exactly when
+ * it mattered.
+ *
+ * Strictly newer, so one push delivered twice is a no-op rather than a rewrite.
+ *
+ * A send of your own that has not had its response yet carries no server
+ * timestamp to compare, and yields: the ruling is that the newest message takes
+ * the bubble even mid-ladder, and the tile you tapped still finishes its own.
+ */
+fun receivedWins(current: SendSnapshot?, incomingServerAt: Long): Boolean = when {
+    current == null -> true
+    current.serverAt == null -> true
+    else -> incomingServerAt > current.serverAt
+}
 
 /**
  * What the screen should show, which is not always what was stored.
@@ -71,13 +98,22 @@ class CurrentSend(private val context: Context) {
         val MSG_ID = intPreferencesKey("msg_id")
         val STATE = stringPreferencesKey("state")
         val AT = longPreferencesKey("at")
+        val FROM_ME = booleanPreferencesKey("from_me")
+        val SERVER_AT = longPreferencesKey("server_at")
     }
 
     val flow: Flow<SendSnapshot?> = context.currentSendStore.data.map { prefs ->
         val sendId = prefs[Keys.SEND_ID] ?: return@map null
         val msgId = prefs[Keys.MSG_ID] ?: return@map null
         val at = prefs[Keys.AT] ?: return@map null
-        SendSnapshot(sendId, msgId, fromName(prefs[Keys.STATE]), at)
+        SendSnapshot(
+            sendId,
+            msgId,
+            fromName(prefs[Keys.STATE]),
+            at,
+            fromMe = prefs[Keys.FROM_ME] ?: true,
+            serverAt = prefs[Keys.SERVER_AT],
+        )
     }
 
     suspend fun current(): SendSnapshot? = flow.first()
@@ -89,6 +125,10 @@ class CurrentSend(private val context: Context) {
             prefs[Keys.MSG_ID] = msgId
             prefs[Keys.STATE] = WidgetState.SENDING.name
             prefs[Keys.AT] = now
+            // A new send is a new subject: it must not inherit the previous
+            // record's provenance or its place in the ordering.
+            prefs[Keys.FROM_ME] = true
+            prefs.remove(Keys.SERVER_AT)
         }
     }
 
@@ -112,6 +152,57 @@ class CurrentSend(private val context: Context) {
             if (fromName(prefs[Keys.STATE]).advancesTo(state)) {
                 prefs[Keys.STATE] = state.name
             }
+        }
+    }
+
+    /**
+     * Records the server's timestamp for a send of ours, once the response
+     * carries it.
+     *
+     * Until this lands the record has no place in the ordering at all, and
+     * anything arriving takes the bubble — which is the agreed behaviour, not a
+     * gap. Guarded on the id like [update], because a later send may already
+     * have replaced the record by the time a slow response comes back.
+     */
+    suspend fun markSentAt(sendId: String, serverAt: Long) {
+        context.currentSendStore.edit { prefs ->
+            if (prefs[Keys.SEND_ID] != sendId) return@edit
+            prefs[Keys.SERVER_AT] = serverAt
+        }
+    }
+
+    /**
+     * Puts a message the other phone sent into the bubble, if it wins.
+     *
+     * Stored as SEEN because that is precisely what it is: it arrived, and you
+     * are looking at it. That one choice also buys the gold artwork, immunity
+     * from the twenty-second timeout — SEEN is not awaiting an outcome — and the
+     * top of the ladder, so no receipt and no stale push can move it afterwards.
+     * A seventh state would have had to be taught to the widget art, the guide
+     * and the ladder for something no widget can ever show.
+     *
+     * The read and the compare happen inside one edit block, so a send of your
+     * own cannot land between them and be silently overwritten.
+     */
+    suspend fun receive(sendId: String, msgId: Int, serverAt: Long) {
+        context.currentSendStore.edit { prefs ->
+            val currentId = prefs[Keys.SEND_ID]
+            val current = if (currentId == null) null else SendSnapshot(
+                currentId,
+                prefs[Keys.MSG_ID] ?: 0,
+                fromName(prefs[Keys.STATE]),
+                prefs[Keys.AT] ?: 0L,
+                fromMe = prefs[Keys.FROM_ME] ?: true,
+                serverAt = prefs[Keys.SERVER_AT],
+            )
+            if (!receivedWins(current, serverAt)) return@edit
+
+            prefs[Keys.SEND_ID] = sendId
+            prefs[Keys.MSG_ID] = msgId
+            prefs[Keys.STATE] = WidgetState.SEEN.name
+            prefs[Keys.AT] = System.currentTimeMillis()
+            prefs[Keys.FROM_ME] = false
+            prefs[Keys.SERVER_AT] = serverAt
         }
     }
 }
