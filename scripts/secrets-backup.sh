@@ -75,6 +75,21 @@ elif [ -f "$OUT" ] && tar -tzf "$OUT" 2>/dev/null | grep -q "worker-secrets.env"
     tar -xzf "$OUT" -C "$STAGE" --wildcards --no-anchored 'worker-secrets.env' 2>/dev/null \
         && PREV_ENV="bundle"
     echo "  [reused]  worker-secrets.env (from the existing $(basename "$OUT"))"
+elif [ -f "$OUT.gpg" ]; then
+    # The encrypted bundle is the copy that is actually KEPT — the plaintext one
+    # is shredded after every run, so on any machine that has done this properly
+    # it is the only source left. Reading only the plaintext tarball is how a
+    # complete backup silently degrades: a stale or blank plaintext copy sitting
+    # in the working directory wins, the three Worker secrets come out empty, and
+    # the freshly written bundle can no longer bring up a machine. Prompts for
+    # the passphrase, which is the correct cost.
+    echo "  [reused]  worker-secrets.env from $(basename "$OUT.gpg") — passphrase needed"
+    if gpg --decrypt "$OUT.gpg" 2>/dev/null \
+        | tar -xz -C "$STAGE" --wildcards --no-anchored 'worker-secrets.env' 2>/dev/null; then
+        PREV_ENV="gpg"
+    else
+        echo "  [WARNING] could not read $(basename "$OUT.gpg"); falling back to a blank template"
+    fi
 fi
 
 if [ -n "$PREV_ENV" ]; then
@@ -118,6 +133,10 @@ if [ -f "$REPO_ROOT/device-tokens.env" ]; then
 elif [ -f "$OUT" ] && tar -tzf "$OUT" 2>/dev/null | grep -q "device-tokens.env"; then
     tar -xzf "$OUT" -C "$STAGE" --wildcards --no-anchored 'device-tokens.env' 2>/dev/null \
         && echo "  [reused]  device-tokens.env (from the existing $(basename "$OUT"))"
+elif [ -f "$OUT.gpg" ]; then
+    gpg --decrypt "$OUT.gpg" 2>/dev/null \
+        | tar -xz -C "$STAGE" --wildcards --no-anchored 'device-tokens.env' 2>/dev/null \
+        && echo "  [reused]  device-tokens.env (from $(basename "$OUT.gpg"))"
 fi
 
 cp "$REPO_ROOT/docs/SECRETS.md" "$STAGE/SECRETS.md" 2>/dev/null || true
