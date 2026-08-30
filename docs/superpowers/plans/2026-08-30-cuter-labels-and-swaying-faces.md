@@ -68,7 +68,7 @@ These were settled before the plan and should not be relitigated during executio
 - Consumes: nothing from earlier tasks.
 - Produces: `val StickerLabel: TextStyle` in `com.lovebutton.app.ui`; `internal val Fredoka: FontFamily`, `internal val Quicksand: FontFamily`, `internal val StickerType: Typography` in the same package.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `app/src/test/java/com/lovebutton/app/ThemeTest.kt` — new imports at the top of the file:
 
@@ -105,13 +105,13 @@ and these two test methods inside the class:
     }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*ThemeTest*'`
 
 Expected: FAIL to compile — `Unresolved reference: StickerLabel`, `Unresolved reference: Fredoka`.
 
-- [ ] **Step 3: Make the type roles visible and add the label style**
+- [x] **Step 3: Make the type roles visible and add the label style**
 
 In `app/src/main/java/com/lovebutton/app/ui/Theme.kt`, change the three `private` declarations to `internal` and add `StickerLabel` after them. Replace lines 48–60 with:
 
@@ -146,13 +146,13 @@ internal val StickerType = Typography(
 )
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*ThemeTest*'`
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Apply the style at the one call site**
+- [x] **Step 5: Apply the style at the one call site**
 
 In `app/src/main/java/com/lovebutton/app/ui/HomeScreen.kt`, line 285, replace:
 
@@ -168,13 +168,13 @@ with:
 
 `StickerLabel` is in the same package, so no import is needed. Delete nothing else — `MaterialTheme` is still used elsewhere in the file.
 
-- [ ] **Step 6: Verify the app still builds**
+- [x] **Step 6: Verify the app still builds**
 
 Run: `./gradlew :app:assembleDebug`
 
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/src/main/java/com/lovebutton/app/ui/Theme.kt \
@@ -195,7 +195,7 @@ git commit -m "feat(ui): the message buttons speak in the display voice"
 - Consumes: nothing from Task 1.
 - Produces: `fun guideWords(state: WidgetState, partnerName: String): String` and `fun guideFace(state: WidgetState): String` in `com.lovebutton.app.ui`. `guideLine(state, partnerName)` keeps its existing signature and returns `"${guideWords(...)} ${guideFace(...)}"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `app/src/test/java/com/lovebutton/app/StateCopyTest.kt`, add these imports beside the existing ones:
 
@@ -250,13 +250,13 @@ Replace the `the lines are the playful ones the guide pins` test (lines 32–40)
     }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*StateCopyTest*'`
 
 Expected: FAIL to compile — `Unresolved reference: guideFace`.
 
-- [ ] **Step 3: Split the copy**
+- [x] **Step 3: Split the copy**
 
 In `app/src/main/java/com/lovebutton/app/ui/StateCopy.kt`, replace lines 13–20 (the whole `guideLine` function, keeping the KDoc block above it) with:
 
@@ -300,13 +300,13 @@ fun guideLine(state: WidgetState, partnerName: String): String =
     "${guideWords(state, partnerName)} ${guideFace(state)}"
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*StateCopyTest*'`
 
 Expected: PASS, 8 tests. `GuideScreen.kt:104` still calls `guideLine` and needs no change.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/com/lovebutton/app/ui/StateCopy.kt \
@@ -327,7 +327,7 @@ git commit -m "feat(ui): part the state lines into words and a face, and give id
 - Consumes: `guideWords(state, partnerName)` and `guideFace(state)` from Task 2.
 - Produces: `fun swayOffsetPx(phase: Float, amplitudePx: Float, animationsOn: Boolean): Float` and `@Composable fun SwayingStateLine(state: WidgetState, partnerName: String, modifier: Modifier = Modifier)` in `com.lovebutton.app.ui`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `app/src/test/java/com/lovebutton/app/SwayingFaceTest.kt`:
 
@@ -387,13 +387,13 @@ class SwayingFaceTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*SwayingFaceTest*'`
 
 Expected: FAIL to compile — `Unresolved reference: swayOffsetPx`.
 
-- [ ] **Step 3: Write the sway**
+- [x] **Step 3: Write the sway**
 
 Create `app/src/main/java/com/lovebutton/app/ui/SwayingFace.kt`:
 
@@ -545,13 +545,13 @@ fun SwayingStateLine(
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests '*SwayingFaceTest*'`
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Put it on the focal area**
+- [x] **Step 5: Put it on the focal area**
 
 In `app/src/main/java/com/lovebutton/app/ui/HomeScreen.kt`, replace lines 211–218 — the `Text` that renders `guideLine` — with:
 
@@ -570,7 +570,7 @@ In `app/src/main/java/com/lovebutton/app/ui/HomeScreen.kt`, replace lines 211–
 
 The `MaterialTheme.typography.titleMedium` style moves inside `SwayingStateLine`, so this call site no longer sets one. Leave the `import androidx.compose.material3.MaterialTheme` in place — `HomeScreen.kt` still uses it at lines 236 and 317.
 
-- [ ] **Step 6: Verify the whole suite and the build**
+- [x] **Step 6: Verify the whole suite and the build**
 
 Run: `./gradlew :app:testDebugUnitTest`
 
@@ -580,7 +580,7 @@ Run: `./gradlew :app:assembleDebug`
 
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/src/main/java/com/lovebutton/app/ui/SwayingFace.kt \
@@ -589,7 +589,7 @@ git add app/src/main/java/com/lovebutton/app/ui/SwayingFace.kt \
 git commit -m "feat(ui): the face on the focal line never sits perfectly still"
 ```
 
-- [ ] **Step 8: Check it on the phone**
+- [x] **Step 8: Check it on the phone**
 
 Install and open the app. This step is the gate — the rest of this task's verification was arithmetic.
 
@@ -610,6 +610,14 @@ Confirm, in order:
 5. **Turn animations off** (Developer options → Animator duration scale → Off) and confirm the face holds still and stays centred.
 
 Report what you saw for each of the five. Do not mark this task complete on tests alone.
+
+**Result — all five pass**, on phone A (`923262ff`, 24115RA8EG, Android 16), 2026-08-30. Measured from screenshot bursts rather than judged by eye, by taking the dark-pixel column extents of the focal line:
+
+1. **Labels** are visibly Fredoka and one point larger. The enrolment screen was not reachable (the phone is already enrolled) but is protected by `the label face does not leak into the rest of the app`.
+2. **The face drifts.** Right edge of the line travelled 933 → 951px across three frames 0.45s apart: 18px total, which at this phone's density is exactly 6dp — the designed ±3dp.
+3. **Nothing reflows.** Left edge of the words was 269px in every frame, and the ink count was identical (11219px) — the same glyphs, moved, not relaid out. The placeholder is measured once, as intended.
+4. **No wrap.** `it buzzed Wifey's phone :3` renders on one line, matching the font-metric prediction.
+5. **Animations off** (`animator_duration_scale 0`, app force-stopped and relaunched): travel 0px across three frames, resting at 942px — the centre of the 933..951 range, so it parks centred rather than stuck at an extreme. The setting was restored to 1 afterwards.
 
 ---
 
