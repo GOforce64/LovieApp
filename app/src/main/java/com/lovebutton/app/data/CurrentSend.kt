@@ -42,16 +42,29 @@ data class SendSnapshot(
  * clocks pretending to be one, and the two bubbles would disagree exactly when
  * it mattered.
  *
- * Strictly newer, so one push delivered twice is a no-op rather than a rewrite.
+ * The clock is epoch SECONDS, so two sends moments apart routinely carry the
+ * same value — and "strictly newer" alone would then leave each phone holding
+ * its own message and the two bubbles disagreeing, which is the one outcome this
+ * whole design exists to prevent. The id breaks the tie. It is arbitrary, but it
+ * is a total order, and both phones hold both ids, so they break it the same way
+ * and stay in agreement. That is the only property that matters here.
  *
  * A send of your own that has not had its response yet carries no server
  * timestamp to compare, and yields: the ruling is that the newest message takes
  * the bubble even mid-ladder, and the tile you tapped still finishes its own.
+ *
+ * One push delivered twice is a no-op: same timestamp, same id, so neither test
+ * passes.
  */
-fun receivedWins(current: SendSnapshot?, incomingServerAt: Long): Boolean = when {
+fun receivedWins(
+    current: SendSnapshot?,
+    incomingServerAt: Long,
+    incomingSendId: String,
+): Boolean = when {
     current == null -> true
     current.serverAt == null -> true
-    else -> incomingServerAt > current.serverAt
+    incomingServerAt != current.serverAt -> incomingServerAt > current.serverAt
+    else -> incomingSendId > current.sendId
 }
 
 /**
@@ -195,7 +208,7 @@ class CurrentSend(private val context: Context) {
                 fromMe = prefs[Keys.FROM_ME] ?: true,
                 serverAt = prefs[Keys.SERVER_AT],
             )
-            if (!receivedWins(current, serverAt)) return@edit
+            if (!receivedWins(current, serverAt, sendId)) return@edit
 
             prefs[Keys.SEND_ID] = sendId
             prefs[Keys.MSG_ID] = msgId
