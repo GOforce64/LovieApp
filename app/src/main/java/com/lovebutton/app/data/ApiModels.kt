@@ -36,6 +36,9 @@ data class SendRequest(
 data class SendResponse(
     @SerialName("send_id") val sendId: String,
     val delivered: Int,
+    // Defaulted, so an app talking to a Worker that predates this field still
+    // parses. Zero means "no server clock", and the caller skips the ordering.
+    @SerialName("sent_at") val sentAt: Long = 0L,
 )
 
 @Serializable
@@ -51,7 +54,7 @@ data class ApiError(
 )
 
 /** What the caller of [LoveButtonApi.send] actually needs. */
-data class SendResult(val sendId: String, val delivered: Int)
+data class SendResult(val sendId: String, val delivered: Int, val sentAt: Long = 0L)
 
 /**
  * Enrolment has three outcomes worth telling apart on screen: it worked, the code

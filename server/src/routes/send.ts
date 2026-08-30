@@ -118,5 +118,9 @@ send.post("/send", async (c) => {
 
   // Always 200, even when delivered is 0. The app shows "no active device on
   // her phone", which is a different and more useful message than a failure.
-  return c.json({ send_id: sendId, delivered });
+  // sent_at is the ordering clock for the app's shared bubble: both phones sort
+  // the latest message by it, and it is the only clock they both see. The same
+  // value is already in the sends row and in the recipient's push, so all three
+  // agree by construction.
+  return c.json({ send_id: sendId, delivered, sent_at: sentAt });
 });

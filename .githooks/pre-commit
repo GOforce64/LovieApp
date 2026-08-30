@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Blocks the two things that must never reach a public repo.
+#
+# Not a substitute for .gitignore — this catches what .gitignore cannot: a key
+# pasted into a file that IS meant to be committed. The repo is public, and the
+# service account key it must never contain can send a push to any device in the
+# Firebase project (spec §4.1).
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+if git diff --cached -U0 -- $staged \
+    | grep -qE '^\+.*(-----BEGIN [A-Z ]*PRIVATE KEY-----|"type": *"service_account")'; then
+  echo "pre-commit: a private key or service account JSON is in this commit. Refusing."
+  echo "  If this is a placeholder in an example file, change the wording so it"
+  echo "  does not look like the real thing."
+  exit 1
+fi
+
+for f in $staged; do
+  case "$f" in
+    *.jks|*.keystore|keystore.properties|local.properties|.dev.vars|app/google-services.json|*service-account*.json)
+      echo "pre-commit: $f must never be committed. Refusing."
+      exit 1 ;;
+  esac
+done

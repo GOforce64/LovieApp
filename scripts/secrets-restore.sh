@@ -39,6 +39,25 @@ else
 fi
 
 # --- 2. Worker secrets ----------------------------------------------------
+# The release signing key. Restored before anything else needs it, and never
+# over an existing one: a keystore already sitting here is the live signing
+# identity, and replacing it with an older copy would silently make every future
+# build uninstallable over what is on her phone.
+for f in love-button-release.jks keystore.properties; do
+    if [ -f "$STAGE/$f" ]; then
+        if [ -f "$REPO_ROOT/$f" ]; then
+            echo "$f already exists — leaving it alone."
+        else
+            cp "$STAGE/$f" "$REPO_ROOT/$f"
+            chmod 600 "$REPO_ROOT/$f"
+            echo "Restored $f"
+        fi
+    else
+        echo "WARNING: bundle has no $f; you will not be able to build an update"
+        echo "         that installs over the copy already on her phone."
+    fi
+done
+
 ENV_FILE="$STAGE/worker-secrets.env"
 [ -f "$ENV_FILE" ] || { echo "bundle has no worker-secrets.env" >&2; exit 1; }
 

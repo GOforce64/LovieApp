@@ -86,6 +86,43 @@ private suspend fun writeWidgetState(
  * rather than as a separate read then write, so a concurrent writer cannot
  * land in between and get silently overwritten by this call.
  */
+/**
+ * Marks one widget failed, but only if it is still waiting on something.
+ *
+ * The tile's counterpart to the focal area's derived timeout. A tile cannot
+ * derive anything, because it only repaints when something pushes an update to
+ * it — left alone it shows the last thing written forever, which is exactly how
+ * a tap made with no signal used to leave it crimson and part-filled for good.
+ *
+ * Guarded on what the tile is currently displaying rather than on any record
+ * elsewhere, per spec §7.1. A receipt that landed in the meantime has already
+ * moved it past waiting, and this becomes a no-op.
+ *
+ * @return whether it actually wrote, so the caller knows if it owns the clear.
+ */
+suspend fun failWidgetStateIfWaiting(context: Context, appWidgetId: Int): Boolean {
+    if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return false
+
+    val manager = GlanceAppWidgetManager(context)
+    val glanceId = runCatching { manager.getGlanceIdBy(appWidgetId) }.getOrNull() ?: return false
+
+    var failed = false
+    updateAppWidgetState(context, glanceId) { prefs ->
+        if (fromName(prefs[KEY_STATE]).isAwaitingOutcome) {
+            prefs[KEY_STATE] = WidgetState.FAILED.name
+            failed = true
+        }
+    }
+    if (!failed) return false
+
+    listOf(LoveWidget(), ThinkingWidget(), MissWidget(), CallWidget()).forEach { widget ->
+        if (glanceId in manager.getGlanceIds(widget.javaClass)) {
+            widget.update(context, glanceId)
+        }
+    }
+    return true
+}
+
 suspend fun clearWidgetStateIf(context: Context, appWidgetId: Int, expected: WidgetState) {
     if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
 

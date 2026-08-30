@@ -161,4 +161,50 @@ class CurrentSendTest {
         assertEquals("second", snap?.sendId)
         assertEquals(WidgetState.SENDING, snap?.state)
     }
+
+    @Test
+    fun `a send reclaims the bubble from an older message that jumped it`() = runTest {
+        val store = CurrentSend(context)
+        store.start("mine", 1, now = 500L)
+        // Hers arrives while ours is still in flight, so it wins by default —
+        // there is no server timestamp on ours yet to compare it against.
+        store.receive("hers", 3, serverAt = 5_000L)
+        assertEquals("hers", store.current()?.sendId)
+
+        // Ours turns out to be the newer of the two. Both phones must end on it.
+        store.markSentAt("mine", msgId = 1, tappedAt = 500L, serverAt = 6_000L)
+
+        val snap = store.current()
+        assertEquals("mine", snap?.sendId)
+        assertEquals(1, snap?.msgId)
+        assertEquals(true, snap?.fromMe)
+        assertEquals(6_000L, snap?.serverAt)
+        // The tap's own clock, not the reclaim's, so the timeout window is not
+        // silently restarted by a slow response.
+        assertEquals(500L, snap?.at)
+    }
+
+    @Test
+    fun `a send does not reclaim from a message that really is newer`() = runTest {
+        val store = CurrentSend(context)
+        store.start("mine", 1, now = 500L)
+        store.receive("hers", 3, serverAt = 9_000L)
+        store.markSentAt("mine", msgId = 1, tappedAt = 500L, serverAt = 6_000L)
+
+        // The agreed rule: the newest message holds the bubble, even mid-ladder.
+        assertEquals("hers", store.current()?.sendId)
+    }
+
+    @Test
+    fun `a newer send of our own is never undone by an older one finishing late`() = runTest {
+        val store = CurrentSend(context)
+        store.start("first", 1, now = 500L)
+        store.start("second", 2, now = 600L)
+
+        // The first send's response arrives after the second replaced it. It must
+        // not resurrect itself: that record was retired by a deliberate tap.
+        store.markSentAt("first", msgId = 1, tappedAt = 500L, serverAt = 9_999L)
+
+        assertEquals("second", store.current()?.sendId)
+    }
 }

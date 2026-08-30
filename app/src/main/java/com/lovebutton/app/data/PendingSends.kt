@@ -15,6 +15,23 @@ import kotlinx.coroutines.flow.first
  */
 const val PENDING_WINDOW_MS = 20_000L
 
+/**
+ * Whether a send tapped at [at] has run out of time.
+ *
+ * One definition, because three places have to agree on it: the focal area, which
+ * greys out a send nothing ever came back for; the widget's timeout, which
+ * unsticks a tile; and the send itself, which abandons a request queued behind a
+ * connection that took too long to arrive. Three separate `now - at > …`
+ * comparisons would eventually disagree by a millisecond in the one direction
+ * that matters.
+ *
+ * A negative age is never expired. The clock can go backwards — NTP correction,
+ * or the user changing the time — and treating that as "long ago" would grey out
+ * a send that had only just been tapped.
+ */
+fun windowClosed(at: Long, now: Long = System.currentTimeMillis()): Boolean =
+    now - at >= PENDING_WINDOW_MS
+
 private val Context.pendingStore by preferencesDataStore(name = "pending_sends")
 
 /**

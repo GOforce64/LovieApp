@@ -10,17 +10,22 @@ before moving on — if the check fails, stop there rather than continuing.
 
 ## Where the project actually stands
 
+**This file is now history.** Every block below has been done; it is kept as the
+record of what had to be done by hand, and as the instructions for doing it again
+on a new machine or a replacement phone.
+
 | Piece | State |
 |---|---|
-| Worker (`server/`) | Code complete, 54 tests passing **locally**. Never deployed. |
-| Android app (`app/`) | Tasks 1–5 done, 13 tests passing, APK builds. Enrolment screen works. |
-| Firebase project | **Does not exist** |
-| Cloudflare D1 + KV | **Do not exist** — `wrangler.toml` holds `00000000-…` placeholders |
-| GitHub backup | Block A below |
-| The buzz (Tasks 6–10) | Blocked until every block below is green |
+| Worker (`server/`) | Deployed, 75 tests passing |
+| Android app (`app/`) | Complete through 1.0, tests passing, running on both phones |
+| Firebase project | Exists (`lovieapp-b4068`) |
+| Cloudflare D1 + KV | Exist; real ids are in `wrangler.toml` |
+| GitHub backup | Done — `github.com/GOforce64/LovieApp` |
+| The buzz | Works, both directions, verified on hardware |
 
-The two plans stop where they stop for one reason: from Task 6 onward the app talks
-to a live Worker and two real phones. That's this file.
+The one thing still genuinely outstanding is moving both phones from the
+debug-signed build to the signed 1.0 release, which needs an uninstall and a
+re-enrol with both codes.
 
 ---
 
@@ -29,13 +34,13 @@ to a live Worker and two real phones. That's this file.
 **Why first:** everything below produces values you'll paste into files. Back up the
 clean state before you start editing it.
 
-- [ ] **A1. Install the GitHub CLI**
+- [x] **A1. Install the GitHub CLI**
 
 ```bash
 sudo pacman -S github-cli
 ```
 
-- [ ] **A2. Log in** — opens a browser, asks you to paste a one-time code.
+- [x] **A2. Log in** — opens a browser, asks you to paste a one-time code.
 
 ```bash
 gh auth login
@@ -43,7 +48,7 @@ gh auth login
 
 Choose: GitHub.com → HTTPS → authenticate with browser.
 
-- [ ] **A3. Create the repo and push** (an agent can run this once A2 is done)
+- [x] **A3. Create the repo and push** (an agent can run this once A2 is done)
 
 ```bash
 cd ~/Projects/LovieApp
@@ -296,7 +301,7 @@ Needed before any channel code runs. **A channel's sound is frozen at creation**
 fixing it later means deleting the channel, which resets her notification settings
 where she can see it. Finalise all four first.
 
-- [ ] **E1. Find four clips — no attribution required**
+- [x] **E1. Find four clips — no attribution required**
 
 | Source | Licence | Notes |
 |---|---|---|
@@ -307,7 +312,7 @@ where she can see it. Finalise all four first.
 
 Search: `notification`, `chime`, `bell`, `pop`, `ding`, `marimba`, `bloop`.
 
-- [ ] **E2. Choose them against these criteria**
+- [x] **E2. Choose them against these criteria**
 
 1. **Under about one second.** Longer clips get truncated by the system anyway.
 2. **Distinct in timbre and pitch shape, not just length.** This is the one that
@@ -320,7 +325,7 @@ Search: `notification`, `chime`, `bell`, `pop`, `ding`, `marimba`, `bloop`.
 4. **Audition all four back to back, quietly, from another room** before deciding.
    That is the real listening condition, not headphones at a desk.
 
-- [ ] **E3. Drop them somewhere and say so**
+- [x] **E3. Drop them somewhere and say so**
 
 Any format — wav, mp3, flac. Put them in one folder, named so the mapping is
 unambiguous:

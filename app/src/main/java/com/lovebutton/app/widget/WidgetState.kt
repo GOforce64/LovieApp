@@ -45,6 +45,17 @@ fun fromName(name: String?): WidgetState =
     WidgetState.entries.firstOrNull { it.name == name } ?: WidgetState.IDLE
 
 /**
+ * Whether this state is still waiting on something that may never come.
+ *
+ * SENDING waits on a request this phone has not managed to make yet; SENT waits
+ * on a receipt from a phone that may be switched off. Everything else has already
+ * resolved — IDLE has nothing pending, and FAILED, DELIVERED and SEEN are
+ * outcomes. Only these two can time out.
+ */
+val WidgetState.isAwaitingOutcome: Boolean
+    get() = this == WidgetState.SENDING || this == WidgetState.SENT
+
+/**
  * How far along the ladder a state sits.
  *
  * Explicit rather than the enum's own ordinal: the declaration order is a

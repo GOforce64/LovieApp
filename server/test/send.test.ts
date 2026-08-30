@@ -82,6 +82,25 @@ describe("POST /v1/send", () => {
     expect(row?.msg_id).toBe(3);
   });
 
+  it("returns the server timestamp it recorded", async () => {
+    interceptFcm(200, { name: "ok" });
+
+    const res = await send({ msg_id: 1 });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ send_id: string; delivered: number; sent_at: number }>();
+
+    expect(typeof body.sent_at).toBe("number");
+
+    // The same value two ways: the response and the stored row. Two phones order
+    // their shared bubble by this number, and it is the only clock they both
+    // see, so a response that disagreed with the row would be a clock neither
+    // could trust.
+    const row = await env.DB.prepare("SELECT sent_at FROM sends WHERE id = ?")
+      .bind(body.send_id)
+      .first<{ sent_at: number }>();
+    expect(row?.sent_at).toBe(body.sent_at);
+  });
+
   it("ignores any recipient the client tries to name", async () => {
     interceptFcm(200, { name: "ok" });
 
