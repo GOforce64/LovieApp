@@ -42,8 +42,16 @@ function isPermanentTokenFailure(status: number, body: FcmErrorBody): boolean {
 
   const detailCodes = (body.error?.details ?? []).map((d) => d.errorCode);
 
-  return detailCodes.includes("UNREGISTERED") ||
-    detailCodes.includes("INVALID_ARGUMENT");
+  // UNREGISTERED only. INVALID_ARGUMENT is ambiguous in exactly the way the
+  // outer status is: FCM returns it for a malformed REQUEST as readily as for a
+  // bad token, and a malformed request fails identically for every one of her
+  // devices — so acting on it deleted every row she has, including the one her
+  // bearer token is looked up by. Her app then gets 401 on everything and the
+  // only way back is re-enrolling by hand with the code from a password manager.
+  // Spec §12 flagged this as the milestone 8 decision; this is that decision.
+  // A live token that really is invalid simply keeps failing, which is a far
+  // cheaper failure than one that locks her out.
+  return detailCodes.includes("UNREGISTERED");
 }
 
 /**

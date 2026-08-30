@@ -70,7 +70,13 @@ describe("sendPush", () => {
     expect(result).toBe("unregistered");
   });
 
-  it("reports unregistered for an invalid argument", async () => {
+  it("does NOT treat an invalid argument as a dead token", async () => {
+    // Spec §12, decided at milestone 8. FCM returns INVALID_ARGUMENT for a
+    // malformed REQUEST as readily as for a bad token, and a malformed request
+    // fails identically for every one of the recipient's devices — so acting on
+    // it deleted all her rows at once, and with them the row her bearer token is
+    // looked up by. Her app then gets 401 on everything and the only way back is
+    // re-enrolling by hand. Ambiguous evidence must not be destructive.
     fetchMock
       .get(FCM_ORIGIN)
       .intercept({ path: FCM_PATH, method: "POST" })
@@ -88,7 +94,7 @@ describe("sendPush", () => {
 
     const result = await sendPush(env, "access-token", "bad-token", { type: "msg" }, "HIGH");
 
-    expect(result).toBe("unregistered");
+    expect(result).toBe("error");
   });
 
   it("treats a 404 with no FCM detail code as transient, not a dead token", async () => {
