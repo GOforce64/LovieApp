@@ -52,13 +52,22 @@ android {
         applicationId = "com.lovebutton.app"
         minSdk = 26
         targetSdk = 36
-        // Bump this on EVERY build that goes to a phone. Android refuses an
-        // install over an equal or lower code, and the refusal names only
+        // Bump versionCode on EVERY build that goes to a phone. Android refuses
+        // an install over an equal or lower code, and the refusal names only
         // INSTALL_FAILED_VERSION_DOWNGRADE — nothing that says "you forgot".
-        // 3 = the pink heart in the notification tray; 2 was the 1.0 release,
-        // which is what both phones are running.
+        //
+        // versionName does NOT follow it. There is one release, 1.0, and it gets
+        // updated in place rather than renamed every time something is fixed;
+        // two people sharing an app do not need a version to talk about, and a
+        // number that climbs invites a changelog nobody is going to write.
+        // Android is fine with this: the name is a display string, the code is
+        // the ordering, and only the code is ever compared.
+        //
+        // The cost, so it is not a surprise: Settings shows 1.0 for every build,
+        // so it cannot tell you whether a phone has the latest one. `adb shell
+        // dumpsys package com.lovebutton.app | grep versionCode` can.
         versionCode = 3
-        versionName = "1.0.1"
+        versionName = "1.0"
 
         // Supplied via local.properties; see the apiBaseUrl block above.
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
