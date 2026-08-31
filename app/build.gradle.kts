@@ -52,10 +52,13 @@ android {
         applicationId = "com.lovebutton.app"
         minSdk = 26
         targetSdk = 36
-        // 2 rather than 1: builds carrying code 1 are already installed on
-        // both phones, and Android refuses an install over an equal code.
-        versionCode = 2
-        versionName = "1.0"
+        // Bump this on EVERY build that goes to a phone. Android refuses an
+        // install over an equal or lower code, and the refusal names only
+        // INSTALL_FAILED_VERSION_DOWNGRADE — nothing that says "you forgot".
+        // 3 = the pink heart in the notification tray; 2 was the 1.0 release,
+        // which is what both phones are running.
+        versionCode = 3
+        versionName = "1.0.1"
 
         // Supplied via local.properties; see the apiBaseUrl block above.
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")

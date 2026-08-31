@@ -312,10 +312,15 @@ def path_of(cells, n):
         f"M{x*unit:.4f},{y*unit:.4f}h{unit:.4f}v{unit:.4f}h-{unit:.4f}z"
         for y in range(n) for x in range(n) if cells[y][x])
 
-def vector_drawable(paths, n):
+def vector_drawable(paths, n, ty=1):
     """22 units of art inside a 24 viewport, whatever the grid size, so icons of
     different grids line up optically next to each other. `paths` is a list of
-    (cells, colour) drawn back to front."""
+    (cells, colour) drawn back to front.
+
+    `ty` exists for the notification icon alone. The widget set shares one offset
+    so the four tiles agree with each other, which matters more there than any
+    single icon being centred; a status-bar icon has no siblings to line up with
+    and is cropped hard, so it gets to be centred on its own bounding box."""
     body = "\n        ".join(
         f'<path android:fillColor="#FF{colour.lstrip("#")}" '
         f'android:pathData="{path_of(cells, n)}" />'
@@ -325,7 +330,7 @@ def vector_drawable(paths, n):
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <group android:translateX="1" android:translateY="1">
+    <group android:translateX="1" android:translateY="{ty}">
         {body}
     </group>
 </vector>
@@ -487,6 +492,35 @@ def build(icons, outdir, title):
     print(f"{title}: {len(icons)*2} drawables + preview.svg -> {outdir}")
 
 KOTLIN_OUT = "app/src/main/java/com/lovebutton/app/widget/PixelGrids.kt"
+NOTIFICATION_OUT = "app/src/main/res/drawable/ic_notification_heart.xml"
+
+
+def emit_notification_icon(grid):
+    """The status-bar icon: the heart as one flat silhouette.
+
+    Android renders a notification's small icon from its ALPHA CHANNEL alone and
+    discards every colour in the source, so shipping the widget's three-layer
+    heart would not give a pink heart in the tray — it would give the union of
+    those layers as one white blob, with the border and the shine invisible.
+    Emitting the silhouette on purpose is exactly the shape the system would
+    derive anyway, minus the pretence that the colours in the file mean
+    anything. The pink is applied at post time with setColor(), which is the one
+    channel Android leaves open for it.
+
+    Generated from the same grid as the widget's heart rather than drawn by
+    hand, for the reason the whole file exists: two hearts maintained separately
+    are two hearts that eventually stop matching.
+    """
+    _, sil, _, _, _, n = parse(grid)
+    # translateY=0, not the shared 1: this grid's top row is blank, so the heart's
+    # real bounding box is 10 rows in an 11-row grid. At the shared offset that
+    # box would sit hard against the bottom of the 24dp canvas, which the status
+    # bar crops. White because only the alpha matters — a pink here would be a lie
+    # about where the colour comes from.
+    with open(NOTIFICATION_OUT, "w") as f:
+        f.write(vector_drawable([(sil, "#FFFFFF")], n, ty=0))
+    print(f"wrote {NOTIFICATION_OUT}")
+
 
 def emit_kotlin(all_icons):
     """The grids as Kotlin, so the app can animate individual pixels.
@@ -521,3 +555,6 @@ if __name__ == "__main__":
     build(ICONS_13, os.path.join(base, "grid-13"), "13x13")
     build(ICONS_APP, os.path.join(base, "grid-app"), "app set")
     emit_kotlin(ICONS_APP)   # the app ships this set
+    # The tray heart follows the WIDGET's grid (11), not the app set: it is the
+    # same picture her tile shows, at the same weight.
+    emit_notification_icon(ICONS_11["heart"])

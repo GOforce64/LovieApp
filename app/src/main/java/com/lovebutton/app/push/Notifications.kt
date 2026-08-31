@@ -10,9 +10,11 @@ import android.app.PendingIntent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.lovebutton.app.MainActivity
+import com.lovebutton.app.R
 import com.lovebutton.app.data.DEV_CHANNEL_ID
 import com.lovebutton.app.data.MESSAGES
 import com.lovebutton.app.data.messageForId
+import com.lovebutton.app.widget.PixelPalette
 import java.util.concurrent.atomic.AtomicInteger
 
 private val notificationCounter = AtomicInteger(1)
@@ -104,8 +106,21 @@ fun postMessageNotification(
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
+    // The tray gets her heart, not a generic envelope. Two halves to that:
+    //
+    // The SHAPE comes from ic_notification_heart, a flat silhouette generated
+    // from the same grid as the widget's heart, because Android builds a small
+    // icon out of the drawable's alpha channel alone and throws the colours
+    // away — handing it ic_heart_filled would produce that same silhouette with
+    // the border and shine silently lost, and a file whose colours were fiction.
+    //
+    // The PINK comes from setColor, which is the only route Android leaves open:
+    // it tints the small icon in the shade and on the lock screen. The status bar
+    // strip is monochrome by OS policy and will show it white however it is
+    // asked, so this is as pink as a notification icon is allowed to be.
     val notification = NotificationCompat.Builder(context, channelId)
-        .setSmallIcon(android.R.drawable.ic_dialog_email)
+        .setSmallIcon(R.drawable.ic_notification_heart)
+        .setColor(PixelPalette.Sent)
         .setContentTitle(fromName)
         .setContentText(text)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
